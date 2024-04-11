@@ -1,0 +1,598 @@
+---
+title: "Ao3 1"
+output: html_document
+date: "2024-01-02"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(faraway)
+library(MASS)
+library(readr)
+library(rvest)
+library(curl)
+library(dplyr)
+library(INLA)
+library(rstan)
+library(reshape2)
+library(lme4)
+library(rstanarm)
+library(bayesplot)
+library(geepack)
+library(RLRsim)
+library(stringr)
+library(stats)
+```
+
+```{r}
+ao3.1 = read_csv("/Users/coramcanulty/Desktop/AO3/ao3fics20000.csv")
+ao3.1
+```
+
+```{r}
+ao3clean1 = unique(ao3.1)
+ao3 = ao3clean1 %>%
+  group_by(objectid) %>%
+  filter(n() == 1)
+```
+
+```{r}
+ao3 %>%
+  ggplot() +
+  geom_boxplot(aes(x=hits))
+ao3 %>%
+  filter(hits < 5000000) %>%
+  ggplot() +
+  geom_boxplot(aes(x=hits))
+
+ao3 %>%
+  ggplot() +
+  geom_boxplot(aes(x=kudos))
+ao3 %>%
+  filter(kudos < 50000) %>%
+  ggplot() +
+  geom_boxplot(aes(x=kudos))
+
+ao3 %>%
+  ggplot() +
+  geom_boxplot(aes(x=words))
+ao3 %>%
+  filter(words < 2000000) %>%
+  ggplot() +
+  geom_boxplot(aes(x=words))
+ao3 %>%
+  filter(words < 500000) %>%
+  ggplot() +
+  geom_boxplot(aes(x=words))
+
+ao3 %>%
+  ggplot() +
+  geom_boxplot(aes(x=chapters))
+
+ao3 %>%
+  ggplot() +
+  geom_boxplot(aes(x=bookmarks))
+
+ao3 %>%
+  ggplot() +
+  geom_boxplot(aes(x=comments))
+
+```
+
+```{r}
+ao3 %>%
+  arrange(-kudos) %>%
+  ggplot() +
+  geom_point(aes(x=hits, y=kudos))
+
+ao3 %>%
+  arrange(-kudos) %>%
+  ggplot() +
+  geom_point(aes(x=bookmarks, y=kudos))
+
+ao3%>%
+  arrange(-kudos)
+
+ao3 %>%
+  filter(kudos < 5000000) %>%
+  ggplot() +
+  geom_histogram(aes(x=kudos))
+
+ao3 %>%
+  filter(kudos < 25000) %>%
+  ggplot() +
+  geom_histogram(aes(x=kudos))
+
+ao3 %>%
+  filter(kudos < 5000) %>%
+  ggplot() +
+  geom_histogram(aes(x=kudos))
+```
+
+Find bot generated kudos
+
+```{r}
+ao3_numbers = ao3 %>%
+  dplyr::select("objectid", "series", 17:22) %>%
+  na.omit(.)
+
+set.seed(336)
+
+kmeans_k3 = kmeans(ao3_numbers[2:8], center = 3 )
+clusters_k3 = kmeans_k3$cluster
+
+objectid_clustersk3 = as.data.frame(cbind(objectid = ao3_numbers$objectid, clusters_k3))
+ao3_k3 = full_join(ao3, objectid_clustersk3)
+
+ao3_k3 %>%
+  ggplot() +
+  geom_point(aes(x=bookmarks, y=kudos, color = as.factor(clusters_k3)))
+
+### Just with bookmarks, hits, series, and kudos
+
+ao3_bhsk = ao3_numbers %>%
+  dplyr::select("objectid", "series", 6:8) %>%
+  na.omit(.)
+
+kmeans_k3_less = kmeans(ao3_bhsk[2:5], center = 3 )
+clusters_k3_less = kmeans_k3_less$cluster
+
+objectid_clustersk3_less = as.data.frame(cbind(objectid = ao3_bhsk$objectid, clusters_k3_less))
+ao3_k3_less = full_join(ao3, objectid_clustersk3_less)
+
+ao3_k3_less %>%
+  ggplot() +
+  geom_point(aes(x=bookmarks, y=kudos, color = as.factor(clusters_k3_less)))
+
+```
+
+```{r}
+ao3 %>%
+  mutate(h_minus_k = hits - kudos) %>%
+  dplyr::select(objectid, title, hits, kudos, h_minus_k) %>%
+  arrange(h_minus_k)
+
+ao3 %>%
+  mutate(h_minus_k = hits - kudos) %>%
+  dplyr::select(objectid, title, hits, kudos, h_minus_k) %>%
+  arrange(-h_minus_k)
+
+ao3 %>%
+  mutate(h_minus_k = hits - kudos) %>%
+  ggplot()+
+  geom_boxplot(aes(x=h_minus_k))
+
+ao3 %>%
+  mutate(h_minus_k = hits - kudos) %>%
+  filter(h_minus_k < 4000000) %>%
+  ggplot()+
+  geom_boxplot(aes(x=h_minus_k))
+
+ao3 %>%
+  mutate(h_minus_k = hits - kudos) %>%
+  ggplot()+
+  geom_boxplot(aes(x=log(h_minus_k)))
+```
+
+```{r}
+ao3.bot = ao3 %>%
+  mutate(h_m_k = hits - kudos, h_r_k = hits/kudos, k_r_b = kudos/bookmarks)
+ao3.bot %>% arrange(h_r_k)
+ao3.bot %>% arrange(-k_r_b)
+
+ao3.bot %>%
+  ggplot()+
+  geom_boxplot(aes(x=k_r_b))
+ao3.bot %>%
+  filter(k_r_b < 1100) %>%
+  ggplot()+
+  geom_boxplot(aes(x=(k_r_b)))
+quantile(ao3.bot$k_r_b, probs = c(0,0.25,0.5,0.75,1), na.rm =T)
+mean = mean(ao3.bot$k_r_b, na.rm=T)
+sd = sd(ao3.bot$k_r_b, na.rm=T)
+mean
+sd
+nintyfive = mean + 2*sd
+nintyfive
+
+ao3.bot %>% 
+  filter(k_r_b > nintyfive) %>%
+  arrange(-k_r_b)
+
+ao3.bot %>% 
+  filter(k_r_b > 7.85) %>%
+  arrange(-k_r_b)
+```
+
+```{r}
+ao3.bot2 = ao3 %>%
+  filter(language == "English") %>%
+  mutate(h_m_k = hits - kudos, h_r_k = hits/kudos, k_r_b = kudos/bookmarks, k_r_c = kudos/comments)
+
+ao3.bot2 %>%
+  ggplot()+
+  geom_boxplot(aes(x=k_r_b))
+ao3.bot2 %>%
+  filter(k_r_b < 1100) %>%
+  ggplot()+
+  geom_boxplot(aes(x=(k_r_b)))
+
+quantile(ao3.bot2$k_r_b, probs = c(0,0.25,0.5,0.75,1), na.rm =T)
+mean = mean(ao3.bot2$k_r_b, na.rm=T)
+sd = sd(ao3.bot2$k_r_b, na.rm=T)
+mean
+sd
+nintyfive = mean + 2*sd
+nintyfive
+
+ao3.bot2 %>% 
+  filter(k_r_b > nintyfive) %>%
+  arrange(-k_r_b)
+
+ao3.bot2 %>% 
+  filter(k_r_b > 7.81) %>%
+  arrange(-k_r_b)
+
+quantile(ao3.bot2$k_r_c, probs = c(0,0.25,0.5,0.75,1), na.rm =T)
+mean(ao3.bot2$k_r_c, na.rm=T)
+
+```
+
+```{r}
+ao3 %>%
+  ggplot() +
+  geom_point(aes(x=bookmarks, y=kudos))
+
+ao3 %>%
+  filter(kudos < 100000) %>%
+  ggplot() +
+  geom_point(aes(x=bookmarks, y=kudos), alpha = .15)
+
+lm_kb = lm(kudos~bookmarks, ao3)
+summary(lm_kb)
+plot(kudos~bookmarks, ao3)
+abline(lm_kb)
+plot(lm_kb)
+
+ao3[112,]
+ao3[777,]
+ao3[223,]
+```
+
+
+```{r}
+
+lm_kb.2 = lm(kudos~bookmarks + I(bookmarks^2), ao3)
+summary(lm_kb.2)
+plot(lm_kb.2)
+
+plot(kudos~bookmarks, ao3)
+lines(sort(na.omit(ao3$bookmarks)), fitted(lm_kb.2)[order(na.omit(ao3$bookmarks))], col='red', type='b')
+
+lm_kb.3 = ao3 %>%
+  filter(kudos < 100000) %>%
+  lm(kudos~bookmarks + I(bookmarks^2), .)
+summary(lm_kb.3)
+
+ao3.notop = ao3 %>%
+  filter(kudos < 100000)
+ao3 %>%
+  filter(kudos < 100000) %>%
+  plot(kudos~bookmarks, .)
+lines(sort(na.omit(ao3.notop$bookmarks)), fitted(lm_kb.3)[order(na.omit(ao3.notop$bookmarks))], col='red', type='b')
+
+ao3[445,]
+ao3[113,]
+```
+
+```{r}
+lm_kb.4 = lm(kudos ~hits + bookmarks, ao3)
+summary(lm_kb.4)
+plot(lm_kb.4)
+
+lm_kb.5 = lm(kudos~ hits*bookmarks, ao3)
+summary(lm_kb.5)
+plot(lm_kb.5)
+```
+
+
+```{r}
+ao3.pred = ao3 %>%
+  drop_na(bookmarks)
+
+ao3.pred$lm4 = predict(lm_kb.4)
+ao3.pred$lm2 = predict(lm_kb.2)
+ao3.pred$lm1 = predict(lm_kb)
+ao3.pred = ao3.pred %>% mutate( res4 = kudos - lm4)
+ao3.pred = ao3.pred %>% mutate( res2 = kudos - lm2)
+ao3.pred = ao3.pred %>% mutate( res1 = kudos - lm1)
+
+ao3.pred %>%
+  arrange(-res2)
+```
+
+```{r}
+ao3.bot2$con_bot = rep(0)
+ao3.bot2[which(ao3.bot2 == 434904, arr.ind=TRUE)[1], "con_bot"] = 1
+ao3.bot2[which(ao3.bot2 == 46452973, arr.ind=TRUE)[1], "con_bot"] = 1
+ao3.bot2[which(ao3.bot2 == 47044213, arr.ind=TRUE)[1], "con_bot"] = 1
+ao3.bot2 %>%
+  filter(fandoms == "['Legacies (TV 2018)']")
+```
+
+Cleaning lists in cells
+```{r}
+### for fandoms
+ao3.2 = ao3
+for (i in 1:length(ao3$fandoms)){
+  content = ao3$fandoms[i]
+
+  listt= content %>%
+    str_sub(2,-2) %>%
+    strsplit(split=",") %>%
+    unlist()
+
+  list2 = c()
+  for(j in 1:length(listt)){
+    l = trimws(listt[j]) %>%
+      str_sub(2,-2)
+    list2 = c(list2, l)
+  }
+
+  list3 = list(list2)
+  ao3.2$fandoms[i] = list3
+}
+ao3.2
+```
+
+```{r}
+## Count fandoms 
+
+count_list = function(list, identify){
+  count = 0
+  for (i in 1:length(list)){
+    fds = unlist(list[i])
+    count1 = (sum(grepl(identify,fds, fixed =TRUE)))
+    count = count + count1
+  }
+  return(count)
+}
+
+```
+
+```{r}
+## List of all fandoms
+
+all_fandoms = c()
+for (i in 1:length(ao3.2$fandoms)){
+  fds = unlist(ao3.2$fandoms[i])
+  for(j in 1:length(fds)){
+    all_fandoms = c(all_fandoms, fds[j])
+  }
+}
+all_fandoms_unique = unique(all_fandoms)
+length(all_fandoms_unique)
+```
+
+```{r}
+fandom.count =  data.frame(matrix(ncol = 2, nrow = length(all_fandoms_unique)))
+colnames(fandom.count) <- c("fandoms", "counts")
+
+for (i in 1:length(all_fandoms_unique)){
+  fandom = all_fandoms_unique[i]
+  count = count_list(ao3.2$fandoms,fandom)
+  fandom.count$fandoms[i] = fandom
+  fandom.count$counts[i] = count
+}
+
+fandom.count %>% arrange(-counts)
+```
+
+```{r}
+fandom.count %>%
+  arrange(-counts)
+fandom.count %>%
+  arrange(-counts) %>%
+  .[1:30,] %>%
+  ggplot()+
+  geom_col(aes(x=fct_reorder(fandoms,counts), y=counts))+
+  scale_x_discrete(guide = guide_axis(angle = 45))
+?geom_col
+```
+
+```{r}
+### for the rest
+ao3.3 = ao3.2
+ao3.test = ao3
+
+clean_df_lists = function(df, new_df, column){
+  
+  old = df$column
+  new = new_df$column
+  
+  for (i in 1:length(old)){
+    
+    content = old[i]
+    
+    listt= content %>%
+      str_sub(2,-2) %>%
+      strsplit(split=",") %>%
+      unlist()
+
+    list2 = c()
+    for(j in 1:length(listt)){
+      l = trimws(listt[j]) %>%
+        str_sub(2,-2)
+      list2 = c(list2, l)
+    }
+
+    list3 = list(list2)
+    new[i] = list3
+  }
+  return(new_df)
+}
+
+clean_df_lists(ao3, ao3.test, fandoms)
+
+#### doesn't work idk why
+```
+
+```{r}
+##Freeforms
+
+ao3.3 = ao3.2
+  
+for (i in 1:length(ao3.2$freeforms)){
+    
+  content = ao3.2$freeforms[i]
+    
+  listt= content %>%
+    str_sub(2,-2) %>%
+    strsplit(split=",") %>%
+    unlist()
+
+  list2 = c()
+  for(j in 1:length(listt)){
+    l = trimws(listt[j]) %>%
+      str_sub(2,-2)
+    list2 = c(list2, l)
+  }
+
+  list3 = list(list2)
+  ao3.3$freeforms[i] = list3
+}
+
+```
+
+```{r}
+##Characters
+  
+for (i in 1:length(ao3.2$characters)){
+    
+  content = ao3.2$characters[i]
+    
+  listt= content %>%
+    str_sub(2,-2) %>%
+    strsplit(split=",") %>%
+    unlist()
+
+  list2 = c()
+  for(j in 1:length(listt)){
+    l = trimws(listt[j]) %>%
+      str_sub(2,-2)
+    list2 = c(list2, l)
+  }
+
+  list3 = list(list2)
+  ao3.3$characters[i] = list3
+}
+
+```
+
+```{r}
+##Warnings
+
+  
+for (i in 1:length(ao3.2$warnings)){
+    
+  content = ao3.2$warnings[i]
+    
+  listt= content %>%
+    str_sub(2,-2) %>%
+    strsplit(split=",") %>%
+    unlist()
+
+  list2 = c()
+  for(j in 1:length(listt)){
+    l = trimws(listt[j]) %>%
+      str_sub(2,-2)
+    list2 = c(list2, l)
+  }
+
+  list3 = list(list2)
+  ao3.3$warnings[i] = list3
+}
+
+##relationship cat
+  
+for (i in 1:length(ao3.2$relationship_cats)){
+    
+  content = ao3.2$relationship_cats[i]
+    
+  listt= content %>%
+    str_sub(2,-2) %>%
+    strsplit(split=",") %>%
+    unlist()
+
+  list2 = c()
+  for(j in 1:length(listt)){
+    l = trimws(listt[j]) %>%
+      str_sub(2,-2)
+    list2 = c(list2, l)
+  }
+
+  list3 = list(list2)
+  ao3.3$relationship_cats[i] = list3
+}
+
+##relationships
+  
+for (i in 1:length(ao3.2$relationships)){
+    
+  content = ao3.2$relationships[i]
+    
+  listt= content %>%
+    str_sub(2,-2) %>%
+    strsplit(split=",") %>%
+    unlist()
+
+  list2 = c()
+  for(j in 1:length(listt)){
+    l = trimws(listt[j]) %>%
+      str_sub(2,-2)
+    list2 = c(list2, l)
+  }
+
+  list3 = list(list2)
+  ao3.3$relationships[i] = list3
+}
+
+```
+
+Freeforms
+
+```{r}
+all_freeforms = c()
+for (i in 1:length(ao3.3$freeforms)){
+  print(i)
+  ff = unlist(ao3.3$freeforms[i])
+  for(j in 1:length(ff)){
+    all_freeforms = c(all_freeforms, ff[j])
+  }
+}
+
+all_freeforms_unique = unique(all_freeforms)
+length(all_freeforms_unique)
+
+freeform.count =  data.frame(matrix(ncol = 2, nrow = length(all_freeforms_unique)))
+colnames(freeform.count) <- c("freeforms", "counts")
+
+for (i in 1:length(all_freeforms_unique)){
+  print(i)
+  freeform = all_freeforms_unique[i]
+  count = count_list(ao3.3$freeforms,freeform)
+  freeform.count$freeforms[i] = freeform
+  freeform.count$counts[i] = count
+}
+
+freeform.count %>% arrange(-counts)
+
+freeform.count %>%
+  arrange(-counts) %>%
+  .[5:30,] %>%
+  ggplot()+
+  geom_col(aes(x=fct_reorder(freeforms,counts), y=counts))+
+  scale_x_discrete(guide = guide_axis(angle = 45))
+```
