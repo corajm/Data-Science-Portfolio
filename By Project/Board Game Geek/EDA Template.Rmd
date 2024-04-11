@@ -1,0 +1,510 @@
+---
+title: "Exploratory Data Analysis"
+author: "STOR 320.(01 OR 02) Group PLACE_GROUP_NUMBER_HERE (Ex: STOR 320.01 Group 12)"
+date: "`r format(Sys.time(), '%B %d, %Y')`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(readr)
+library(dplyr)
+library(rvest)
+library(curl)
+
+# Import Data Below
+bg = read_csv("boardgames1.csv")
+```
+
+# Creator: Cora McAnulty
+
+### Q1: Are certain mechanics more prevalent in certain years? What mechanics have been most common (and favorable) throughout the years? Are there observable ‘phases’ in the board game community? 
+
+```{r}
+# Scrape list of all mechs
+
+URL.mech="https://boardgamegeek.com/browse/boardgamemechanic"
+
+AllMechanicsBad = URL.mech %>%
+  read_html() %>%
+  html_table(fill=TRUE) %>%
+  .[[1]]
+AllMechanics = stack(AllMechanicsBad) %>% arrange(values) %>% filter( values != "") %>% .$values
+```
+
+```{r}
+# Create matrix that counts Number of observances of each mechanic
+
+#Below is the code I wrote to do this, don't run, takes too long, import data frame 
+#  mechlist = bg$boardgamemechanic
+#  MechCount = c(rep(0, length(AllMechanics)))
+#  for(i in 1:length(mechlist)){
+#    list = mechlist[i]
+#    for(j in 1:length(AllMechanics)){
+#      if(str_detect(list,AllMechanics[j]) == T){
+#        MechCount[j] = MechCount[j] +1
+#      }
+#    }
+#  }
+#  Countdf = data.frame(AllMechanics, MechCount)
+
+Countdf = read_csv("Countdf.csv",show_col_types = FALSE)
+TenMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:10]
+FiftyMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:50]
+TwentyMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:20]
+AllNonZeroMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:163]
+head(Countdf)
+```
+
+```{r}
+#Create a Binary Matrix, where each game row has a column for each mechanic and 1 = the game has that mechanic and 0 = the game does not have that mechanic
+
+#Below is the code I wrote to do this, don't run, takes too long, import data frame 
+#  MechanicsBinary = data.frame(matrix(NA, length(mechlist),164))
+#  names(MechanicsBinary) = (c("name",AllNonZeroMechs))
+#  games = bg$name
+#
+#  for(i in 1:length(mechlist)){
+#    list2 = mechlist[i]
+#    MechanicsBinary[i,1] = games[i]
+#    for(j in 1:length(AllNonZeroMechs)){
+#      if(str_detect(list2,AllNonZeroMechs[j]) == T){
+#        MechanicsBinary[i,j+1] = 1
+#      }else{
+#        MechanicsBinary[i,j+1] = 0
+#      }
+#    }
+#    print(i)
+#  }
+
+MechanicsBinary = read_csv("MechanicsBinary.csv",show_col_types = FALSE)
+bgNameYearMech = bg %>% dplyr::select(yearpublished) %>% cbind(MechanicsBinary)
+```
+
+```{r}
+#Create a Matrix with Number of observences of each mech in each year and then gather to make it easier to graph
+
+CountsByYears = data.frame(matrix(NA, 190,length(bgNameYearMech)-1))
+names(CountsByYears) = c("year", colnames(bgNameYearMech)[3:length(bgNameYearMech)])
+
+for(i in 3:length(colnames(bgNameYearMech))){
+  ivar = rlang::sym(colnames(bgNameYearMech)[i])
+  summary = bgNameYearMech %>%
+  group_by(yearpublished) %>%
+  summarise(Count = sum(!! ivar))
+  if(i ==3){
+    CountsByYears$year = summary$yearpublished
+    CountsByYears[i-1] = summary$Count
+  }else{
+    CountsByYears[i-1] = summary$Count
+  }
+}
+
+CountsByYears.2 = CountsByYears %>%
+  gather(`Dice Rolling`:`Selection Order Bid`, key = "Mech", value = "Count")
+
+head(CountsByYears.2)
+
+```
+
+```{r}
+#First Graph, Counts don't work well because many more games came out in the later years, so this graph looks like all mechanics are getting more common, which doesn't tell us anything
+
+CountsByYears.2[1:3800,] %>%
+  ggplot(aes(x=year, y = Mech, fill=Count)) +
+  geom_tile() + 
+  xlim(1950,2018)+
+  scale_fill_distiller(palette = "YlGn", direction=2)+ 
+  ggtitle("Number of Games with Mech each year since 1950")
+```
+
+```{r}
+#Lets look at Frequency instead of count
+
+CountsByYears.3 = bg %>%
+  group_by(yearpublished) %>%
+  summarise(TotalPerYear = n()) %>%
+  right_join(CountsByYears.2, join_by(yearpublished == year)) %>%
+  mutate(Year = yearpublished, Freq = Count/TotalPerYear) %>%
+  dplyr::select(Year,Mech,Count,Freq)
+
+CountsByYears.3 %>%
+  subset(Mech %in% TenMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line()  + 
+  ggtitle("Frequency of Ten Most Common Mechanics since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+# 1975 is the first year with more than 100 bgs
+
+CountsByYears.3 %>%
+  subset(Mech %in% TwentyMostPopMechs) %>%
+  filter(Year >= 1975, Year <= 2019) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() +
+  scale_fill_distiller(palette = "YlGn", direction=2)  + 
+  ggtitle("Frequency of Twenty Most Common Mechanics since 1975")
+
+CountsByYears.3 %>%
+  subset(Mech %in% FiftyMostPopMechs) %>%
+  filter(Year >= 1975, Year <= 2019) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  scale_fill_distiller(palette = "YlGn", direction=2)  + 
+  ggtitle("Frequency of Fifty Most Common Mechanics since 1975")
+
+CountsByYears.3 %>%
+  filter(Year >= 1975, Year <= 2019) %>%
+  subset(Mech %in% TenMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line()  + 
+  ggtitle("Frequency of Ten Most Common Mechanics since 1975")
+```
+
+Conclusions --> Yes, certain mechanics are more prevalent in certain years. **Dice Rolling** has been the most consistent game mechanic, taking a small dip around 2000. **Hexagon grid** was by far the most common but has been falling out since the 70's, with a short rise in popularity in mid 90's.**Roll/Spin and Move** was fairly common but has been overall loosing prevalence since 1970s. **Hand Management** has been gaining prevalence since early 2000s, and is now one of the most common. **Set collection** has been gaining since mid 2000s. **Variable player powers** saw a sharper gain in prevalence since 2010. **Take That** has seen a sharp spike in prevalence since around 2012. **Area Majority / Influence** has also seen a spike since 2010. **Stock Holding** had two small spikes in the 80s. **Auction Bidding** saw a spike from mid 90's through 2010.
+
+### Q2: Which mechanics lead to higher rankings?
+
+```{r}
+#Create a matrix with our Mechanics and with rank
+
+bgMechRank = bg %>% dplyr::select(sortindex,usersrated,average,baverage,stddev) %>% cbind(MechanicsBinary)
+```
+
+```{r, warning = F}
+#Create a data frame with Average Rank for games with mech vs average rank for games without the Mech.
+
+AvgRankDF = data.frame(matrix(NA, 163,9))
+names(AvgRankDF) = (c("Mech","AvgRankWith","CIWith.Up","CIWith.Low","AvgRankWO","CIWo.Up","CIWo.Low","CountWith", "CountWO"))
+
+for(i in 7:length(colnames(bgMechRank))){
+  SummaryTable1 = bgMechRank %>%
+    filter((bgMechRank)[i] == 1) %>%
+    summarise(Count = n(), Avg = mean(sortindex), SD = sd(sortindex), CIU = Avg +1.96*(SD/sqrt(Count)), CIL = Avg -1.96*(SD/sqrt(Count)))
+  SummaryTable2 = bgMechRank %>%
+    filter((bgMechRank)[i] == 0) %>%
+    summarise(Count = n(), Avg = mean(sortindex), SD = sd(sortindex), CIU = Avg +1.96*(SD/sqrt(Count)), CIL = Avg -1.96*(SD/sqrt(Count)))
+  AvgRankDF[i-6,1] = colnames(bgMechRank)[i]
+  AvgRankDF[i-6,2] = SummaryTable1$Avg
+  AvgRankDF[i-6,3] = SummaryTable1$CIU
+  AvgRankDF[i-6,4] = SummaryTable1$CIL
+  AvgRankDF[i-6,5] = SummaryTable2$Avg
+  AvgRankDF[i-6,6] = SummaryTable2$CIU
+  AvgRankDF[i-6,7] = SummaryTable2$CIL
+  AvgRankDF[i-6,8] = SummaryTable1$Count
+  AvgRankDF[i-6,9] = SummaryTable2$Count
+}
+
+head(AvgRankDF)
+```
+
+```{r, warning =F}
+#Create DF with difference between between Average Rank with Mech vs Average Rank without Mech. Then Plot the differences for each mech with confidence intervals.
+
+AvgRankDiffAll = AvgRankDF %>%
+  mutate(RankDif = AvgRankWO - AvgRankWith, CIDif.Up = CIWo.Up - CIWith.Up, CIDif.Low = CIWo.Low - CIWith.Low) %>%
+  dplyr::select(Mech, RankDif,CIDif.Up,CIDif.Low, everything()) %>%
+  arrange(-RankDif)
+
+AvgRankDiff3Fig = AvgRankDF %>%
+  filter(CountWith >= 100) %>%
+  mutate(RankDif = AvgRankWO - AvgRankWith, CIDif.Up = CIWo.Up - CIWith.Up, CIDif.Low = CIWo.Low - CIWith.Low) %>%
+  dplyr::select(Mech, RankDif,CIDif.Up,CIDif.Low, everything()) %>%
+  arrange(-RankDif)
+
+AvgRankDiffAll %>%
+  ggplot(aes(x=Mech, y=RankDif, ymin = CIDif.Low, ymax = CIDif.Up)) +
+  geom_pointrange() + 
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  ggtitle("Difference in Average Rank for Board Games with vs without a 
+          Mechanic with 95% Confidence Intervals")+
+  labs(caption = "Some Mechanics had as few as 2 games with that mechanic 
+       in the data set, so these mechs are typically gonna have a larger 
+       difference and a larger confidence interval")
+
+#The point with the largest Confidence Interval
+
+AvgRankDiffAll %>% filter(Mech == "Pattern Movement")
+
+AvgRankDiff3Fig %>%
+  ggplot(aes(x=Mech, y=RankDif, ymin = CIDif.Low, ymax = CIDif.Up)) +
+  geom_pointrange() +
+  theme(axis.text.x = element_text(angle = 90, size = 4))+ 
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  ggtitle("Difference in Average Rank for Board Games with vs without a 
+          Mechanic with 95% Confidence Intervals")+
+  labs(caption = "Only for mechanics with at least 100 games")
+```
+
+```{r}
+#Lets look at some boxplots with Average Rank for Games with a Mechanic vs without that mechanic, but just for the 5 Mechanics with the most Positive differnce and the 5 with the most negative Difference, among the Mechanics with at least 100 games
+
+TopTenDif3Fig = AvgRankDiff3Fig[1:10,] %>% .$Mech
+BottomTenDif3Fig = AvgRankDiff3Fig[39:48,] %>% .$Mech
+
+#Most Pos Difference
+
+plist = list()
+for(i in 1:6){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = TopTenDif3Fig[i])
+    p = ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(TopTenDif3Fig[i])
+    plist[[i]] = p
+}
+
+gridExtra::grid.arrange(plist[[1]],plist[[2]], ncol =1)
+gridExtra::grid.arrange(plist[[3]],plist[[4]], ncol =1)
+gridExtra::grid.arrange(plist[[5]],plist[[6]], ncol =1)
+
+#Most Neg Difference
+
+plist2 = list()
+for(i in 1:4){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = BottomTenDif3Fig[i+6])
+  p = ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(BottomTenDif3Fig[i+6])
+  plist2[[i]] = p
+}
+
+gridExtra::grid.arrange(plist2[[1]],plist2[[2]], ncol =1)
+gridExtra::grid.arrange(plist2[[3]],plist2[[4]], ncol =1)
+
+```
+
+
+Conclusions --> The average Rank difference is typically between -5000 to 5000 among mechanics with atleast 100 games. Most average rank difference confidence intervals are not overlapping 0, so that implies that mechanics do have an effect on the ranking of the game.   
+The two mechanics with the greatest average rank difference (when taking count into acount) is **Solo/Solitaire Games** (positive difference) and **Roll/Spin and Move** (negative difference). This makes sense becuase according to BGG "[The term Roll/Spin and Move] is often used derogatorily to imply that there is no thought involved.". Many games that have the Solo/Solitaire Games mechanic have options to play as single player or with a group. These types of games maybe more popular on BGG because the average board game geek could have a hard time finding people to play with.
+Other Mechanics with a fairly large positive effect on the average ranking - **Worker Placement**, **Network and Route Building**, **Area Majority / Influence**, **Variable Phase Order**, **Grid Movement**, **Action Queue**, **Action Points**, **Variable Player Powers**, **Campaign/Battle Card Driven**
+Other Mechanics with a fairly large negative effect on the average ranking - **Deduction**, **Trading**, **Rock-Paper-Scissors**, **Betting and Bluffing**
+
+# Interpreter: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Orator: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Deliverer: FIRSTNAME LASTNAME
+
+### Q1: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+### Q2: WRITE_QUESTION_HERE
+
+```{r}
+#
+```
+
+# Follow-up Questions
+
+### New Questions Based Off Initial Investigation
+
+- Q1: WRITE_QUESTION_HERE
+- Q2: WRITE_QUESTION_HERE
+- Q3: WRITE_QUESTION_HERE 
+- Q4: WRITE_QUESTION_HERE
+
+### Investigation of Follow-up Questions
+
+GIVE WHAT 2 QUESTIONS YOU ATTEMPTED TO INVESTIGATE FURTHER IN COMPLETE SENTENCES (*Example:* Our group decided to investigate Q2 and Q4 in further detail.)
+
+SHOW AT LEAST 2 TABLES OR FIGURES BELOW THAT EXPLORE ANSWERS FOR THE QUESTIONS YOU ARE INVESTIGATING FURTHER.
+
+```{r}
+#
+```
+
+Q2
+
+```{r}
+#Find summary statistics for Ranking for each year
+
+AvgRankYear = bg %>%
+  group_by(yearpublished) %>%
+  summarise(AvgRank = mean(sortindex), StdDev = sd(sortindex), Count = n(), CI.Up = AvgRank + 1.96*(StdDev/sqrt(Count)) , CI.Low =AvgRank - 1.96*(StdDev/sqrt(Count)) )
+
+head(AvgRankYear)
+```
+
+```{r}
+#Create Graphs
+
+AvgRankYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRank)) +
+  geom_line() + 
+  ggtitle("Average Rank of Games vs Year since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+AvgRankYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRank)) +
+  geom_line() +
+  xlim(1975,NA) +
+  ylim(6000, 15000) + 
+  ggtitle("Average Rank of Games vs Year since 1975 CE") +
+  labs(caption = "Note -- Lower Rank = Better")
+
+AvgRankYear %>% 
+  filter(Count >= 100, yearpublished != 0) %>%
+  ggplot(aes(x = yearpublished, y = AvgRank, ymin = CI.Low, ymax = CI.Up)) +
+  geom_pointrange()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) +
+  geom_vline(xintercept=2008, linetype="dashed", color = "red", alpha = .4) +
+  ggtitle("Average Rank of Games vs Year since 1975 CE with 95% Confidence Intervals") +
+  labs(caption = "Note -- Lower Rank = Better")
+```
+
+Conclusions --> There seems to be a large shift (about 2500 spots) towards more positive rankings in 2003, and a little bit of a shift in 2008, but definitly not as large (about 1000 spots). Overall the rankings seem to favor newer games. Before 2003 the average rankings kind of fluctuated on a wave like shape.  
+
+```{r}
+#Find summary statistics for Rating (baverage) for each year
+
+AvgRatingYear = bg %>%
+  group_by(yearpublished) %>%
+  summarise(AvgRating = mean(baverage), StdDev = sd(baverage), Count = n(), CI.Up = AvgRating + 1.96*(StdDev/sqrt(Count)) , CI.Low =AvgRating - 1.96*(StdDev/sqrt(Count)) )
+
+head(AvgRatingYear)
+```
+
+```{r}
+#Create Graphs
+
+AvgRatingYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRating)) +
+  geom_line() + 
+  ggtitle("Average Rating of Games vs Year since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+AvgRatingYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRating)) +
+  geom_line() +
+  xlim(1975,NA) + 
+  ggtitle("Average Rating of Games vs Year since 1975 CE")
+
+AvgRatingYear %>% 
+  filter(Count >= 100, yearpublished != 0) %>%
+  ggplot(aes(x = yearpublished, y = AvgRating, ymin = CI.Low, ymax = CI.Up)) +
+  geom_pointrange()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Average Rating of Games vs Year since 1975 CE with 95% Confidence Intervals")
+
+```
+
+Conclusions --> Since baverage is the way that rankings are ordered we expected to see the same sort of information in this graph, and we do. There is again this wave shape before 2003, and then a large shift around 2003, jumping about 1 point up in average ratings. The confidence intervals also get a lot smaller after 2003, probably because a lot more games were coming out each year. We don't see a shift really in 2008 in this graph. Again, overall ratings seem to be getting more positive, and seem to still be on this trend. BGG users seem to favor newer games.
+
+```{r}
+#Lets use some previous info about mechanics to try and see why there was a shift in 2003
+
+MechMostEffectRank = c("Solo / Solitaire Game","Worker Placement","Network and Route Building","Area Majority / Influence","Variable Phase Order","Grid Movement","Action Queue","Action Points","Variable Player Powers","Campaign / Battle Card Driven")
+MechMostNegEffectRank = c("Line Drawing","Trick-taking","Pattern Recognition", "Memory","Acting","Betting and Bluffing","Rock-Paper-Scissors","Trading","Deduction","Roll / Spin and Move")
+```
+
+```{r, warning=FALSE}
+#Create Graphs
+
+CountsByYears.3 %>%
+  filter(Mech %in% MechMostEffectRank) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Frequency of Ten Mechanics that most Positivly effect ranking 
+          vs Years since 1975")
+
+CountsByYears.3 %>%
+  filter(Mech %in% MechMostNegEffectRank) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Frequency of Ten Mechanics that most Negativley effect ranking 
+          vs Years since 1975")
+
+CountsByYears.3 %>%
+  filter(Mech %in% c("Worker Placement","Grid Movement","Variable Player Powers","Area Majority / Influence")) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  geom_vline(xintercept=2008, linetype="dashed", color = "red", alpha = .4) +
+  ggtitle("Frequency of Mechanics vs Years since 1975") +
+  labs(caption = "Looking specifically for a positive shift around 2003")
+
+CountsByYears.3 %>%
+  filter(Mech %in% c("Trading", "Roll / Spin and Move")) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Frequency of Mechanics vs Years since 1975") +
+  labs(caption = "Looking specifically for a negative shift around 2003")
+
+CountsByYears.3 %>%
+  filter(Mech %in% c("Roll / Spin and Move")) %>%
+  ggplot(aes(x=Year, y = Count, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Count of Mechanics vs Years since 1975") +
+  labs(caption = "Looking specifically for a negative shift around 2003")
+```
+
+Conclusions --> Looking at the mechanics that we know are associated with better rankings from question 10, three seem to have some shift around 2003: **Area Majority / Influence**, **Grid Movement**, and **Worker Placement**. An increase in games with these mechanics could be responsible for the big jump in rankings. **Variable Player Powers** also saw a big shift around 2008. This could be responsible for the 2008 shift in rankings. Looking at mechanics that we know are associated with worse rankings, we see a huge shift in **Roll / Spin and Move** games around 2003. Knowing what we know about how much games with this mechanic are hated and how big of an effect this mechanic has on rankings we can assume that the positive shift in rankings in 2003 was at least partially associated with the plumet in prevalence of 'Roll / Spin and Move' games. We can also see that there wasn't just less 'Roll / Spin and Move' games relatively in the whole board game landscape after 2003, the actual number of 'Roll / Spin and Move' games being produced was dropping.
+
+# Summary
+
+GIVE A 2 PARAGRAPH SUMMARY. 
+
+PARAGRAPH 1 SHOULD DESCRIBE WHAT YOU LEARNED ABOUT YOUR DATA FROM INVESTIGATING THE INITIAL QUESTIONS. DID YOU FIND ANYTHING UNUSUAL IN YOUR DATA? DID ANYTHING SURPRISE YOU? WHICH OF THE INITIAL QUESTIONS WERE HELPFUL IN LEADING YOU TO MORE QUESTIONS?
+
+PARAGRAPH 2 SHOULD SUMMARIZE WHAT YOU LEARNED FROM INVESTIGATING THE FOLLOW-UP QUESTIONS. WHY ARE THESE FOLLOW-UP QUESTIONS INTERESTING FOR INVESTIGATION? DESCRIBE THE TABLES/FIGURES YOU USED TO EXPLORE ANSWERS TO THESE FOLLOW-UP QUESTIONS? WHAT DID YOU LEARN FROM THE TABLES/FIGURES REGARDING THE FOLLOW-UP QUESTIONS YOU PROPOSED?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,0 +1,157 @@
+---
+title: "EDAnewq2"
+output: html_document
+date: '2023-11-01'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(faraway)
+library(MASS)
+library(readr)
+library(rvest)
+library(curl)
+library(dplyr)
+```
+
+
+QUESTION -- Which years produced higher rankings or baverages (user rating)? Are there any trends? Rating inflation/deflation?
+
+```{r}
+bg = read_csv("/Users/coramcanulty/Desktop/STOR 320/boardgames1.csv")
+bg
+```
+
+```{r}
+AvgRankYear = bg %>%
+  group_by(yearpublished) %>%
+  summarise(AvgRank = mean(sortindex), StdDev = sd(sortindex), Count = n(), CI.Up = AvgRank + 1.96*(StdDev/sqrt(Count)) , CI.Low =AvgRank - 1.96*(StdDev/sqrt(Count)) )
+
+AvgRankYear
+```
+
+```{r}
+AvgRankYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRank)) +
+  geom_line()
+
+AvgRankYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRank)) +
+  geom_line() +
+  xlim(1975,NA) +
+  ylim(6000, 15000)
+
+AvgRankYear %>% 
+  filter(Count >= 100, yearpublished != 0) %>%
+  ggplot(aes(x = yearpublished, y = AvgRank, ymin = CI.Low, ymax = CI.Up)) +
+  geom_pointrange()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+```
+
+```{r}
+AvgRatingYear = bg %>%
+  group_by(yearpublished) %>%
+  summarise(AvgRating = mean(baverage), StdDev = sd(baverage), Count = n(), CI.Up = AvgRating + 1.96*(StdDev/sqrt(Count)) , CI.Low =AvgRating - 1.96*(StdDev/sqrt(Count)) )
+AvgRatingYear
+```
+
+```{r}
+AvgRatingYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRating)) +
+  geom_line()
+
+AvgRatingYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRating)) +
+  geom_line() +
+  xlim(1975,NA)
+
+AvgRatingYear %>% 
+  filter(Count >= 100, yearpublished != 0) %>%
+  ggplot(aes(x = yearpublished, y = AvgRating, ymin = CI.Low, ymax = CI.Up)) +
+  geom_pointrange()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+
+AvgRatingYear %>%
+  ggplot(aes(x = yearpublished, y = Count)) +
+  geom_line()
+AvgRatingYear %>%
+  filter(yearpublished >= 1975) %>%
+  ggplot(aes(x = yearpublished, y = Count)) +
+  geom_line()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+```
+
+```{r}
+MechBinary = read_csv("/Users/coramcanulty/Desktop/STOR 320/MechanicsBinary.csv")
+MechCountsByYears.3 = read_csv("/Users/coramcanulty/Desktop/STOR 320/CountsByYears.3.csv")
+MechCountdf = read_csv("/Users/coramcanulty/Desktop/STOR 320/Countdf.csv")
+MechCountdf
+MechBinary
+MechCountsByYears.3
+
+```
+
+```{r}
+TenMostPopMechs = MechCountdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:10]
+FiftyMostPopMechs = MechCountdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:50]
+TwentyMostPopMechs = MechCountdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:20]
+```
+
+```{r}
+for(i in 1:30){
+  OneMechCount = MechCountsByYears.3 %>%
+    filter(Mech == FiftyMostPopMechs[i])
+  print(OneMechCount %>%
+          ggplot(aes(x=Year, y = Freq)) +
+          geom_line() + 
+          xlim(1975,2019)  + 
+          ylim(0,.5) +
+          ggtitle(FiftyMostPopMechs[i]) +
+          geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4))
+}
+```
+
+```{r}
+MechMostEffectRank = c("Solo / Solitaire Game","Worker Placement","Network and Route Building","Area Majority / Influence","Variable Phase Order","Grid Movement","Action Queue","Action Points","Variable Player Powers","Campaign / Battle Card Driven")
+MechMostNegEffectRank = c("Line Drawing","Trick-taking","Pattern Recognition", "Memory","Acting","Betting and Bluffing","Rock-Paper-Scissors","Trading","Deduction","Roll / Spin and Move")
+```
+
+
+```{r}
+MechCountsByYears.3 %>%
+  filter(Mech %in% MechMostEffectRank) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% MechMostNegEffectRank) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% c("Worker Placement","Grid Movement","Variable Player Powers","Area Majority / Influence")) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% c("Trading", "Roll / Spin and Move")) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4)
+```
+
+
+

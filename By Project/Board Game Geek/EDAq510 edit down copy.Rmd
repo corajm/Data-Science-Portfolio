@@ -1,0 +1,465 @@
+---
+title: "EDA q 5 10"
+output: html_document
+date: '2023-10-30'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(faraway)
+library(MASS)
+library(readr)
+library(rvest)
+library(curl)
+library(dplyr)
+```
+
+```{r}
+bg = read_csv("/Users/coramcanulty/Desktop/STOR 320/boardgames1.csv")
+bg
+```
+
+# QUESTION 1
+
+Are certain mechanics more prevalent in certain years? What mechanics have been most common (and favorable) throughout the years? Are there observable ‘phases’ in the board game community? 
+
+
+```{r}
+# Scrape list of all mechs
+
+URL.mech="https://boardgamegeek.com/browse/boardgamemechanic"
+
+AllMechanicsBad = URL.mech %>%
+  read_html() %>%
+  html_table(fill=TRUE) %>%
+  .[[1]]
+AllMechanicsBad
+```
+
+```{r}
+AllMechanics = stack(AllMechanicsBad) %>% arrange(values) %>% filter( values != "") %>% .$values
+```
+
+```{r}
+mechlist = bg$boardgamemechanic
+MechCount = c(rep(0, length(AllMechanics)))
+for(i in 1:length(mechlist)){
+  list = mechlist[i]
+  for(j in 1:length(AllMechanics)){
+    if(str_detect(list,AllMechanics[j]) == T){
+      MechCount[j] = MechCount[j] +1
+    }
+  }
+}
+Countdf = data.frame(AllMechanics, MechCount)
+```
+```{r}
+Countdf %>% arrange(-MechCount)
+TenMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:10]
+FiftyMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:50]
+TwentyMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:20]
+AllNonZeroMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:163]
+```
+
+```{r}
+write_csv(Countdf, "Countdf.csv")
+```
+
+```{r}
+MechanicsBinary = data.frame(matrix(NA, length(mechlist),164))
+names(MechanicsBinary) = (c("name",AllNonZeroMechs))
+games = bg$name
+
+for(i in 1:length(mechlist)){
+  list2 = mechlist[i]
+  MechanicsBinary[i,1] = games[i]
+  for(j in 1:length(AllNonZeroMechs)){
+    if(str_detect(list2,AllNonZeroMechs[j]) == T){
+      MechanicsBinary[i,j+1] = 1
+    }else{
+      MechanicsBinary[i,j+1] = 0
+    }
+  }
+  print(i)
+}
+MechanicsBinary
+```
+
+```{r}
+write_csv(MechanicsBinary, "MechanicsBinary.csv")
+```
+
+
+```{r}
+bgNameYearMech = bg %>% dplyr::select(yearpublished) %>% cbind(MechanicsBinary)
+bgNameYearMech
+```
+
+```{r}
+bgNameYearMech %>% 
+  group_by(yearpublished) %>%
+  summarise(DiceRolling = sum(`Dice Rolling`)) %>%
+  ggplot(aes(x = yearpublished, y =DiceRolling)) +
+  geom_point()
+bgNameYearMech %>% 
+  group_by(yearpublished) %>%
+  summarise(DiceRolling = sum(`Dice Rolling`)) %>%
+  ggplot(aes(x = yearpublished, y =DiceRolling)) +
+  geom_point() +
+  xlim(1900, NA)
+```
+
+```{r}
+CountsByYears = data.frame(matrix(NA, 190,length(bgNameYearMech)-1))
+names(CountsByYears) = c("year", colnames(bgNameYearMech)[3:length(bgNameYearMech)])
+
+for(i in 3:length(colnames(bgNameYearMech))){
+  ivar = rlang::sym(colnames(bgNameYearMech)[i])
+  summary = bgNameYearMech %>%
+  group_by(yearpublished) %>%
+  summarise(Count = sum(!! ivar))
+  if(i ==3){
+    CountsByYears$year = summary$yearpublished
+    CountsByYears[i-1] = summary$Count
+  }else{
+    CountsByYears[i-1] = summary$Count
+  }
+}
+CountsByYears
+
+```
+
+```{r}
+ggplot(CountsByYears, aes(x=year)) +
+  geom_line(aes(y=`Dice Rolling`), color = "red") +
+  geom_line(aes(y=`Hand Management`), color = "orange") +
+  geom_line(aes(y=`Set Collection`), color = "yellow") +
+  geom_line(aes(y=`Hexagon Grid`), color = "green") +  
+  geom_line(aes(y=`Variable Player Powers`), color = "blue") +
+  geom_line(aes(y=`Tile Placement`), color = "lightblue") +
+  geom_line(aes(y=`Roll / Spin and Move`), color = "violet") +
+  geom_line(aes(y=`Modular Board`), color = "purple")
+
+ggplot(CountsByYears, aes(x=year)) +
+  geom_line(aes(y=`Dice Rolling`), color = "red") +
+  geom_line(aes(y=`Hand Management`), color = "orange") +
+  geom_line(aes(y=`Set Collection`), color = "yellow") +
+  geom_line(aes(y=`Hexagon Grid`), color = "green") +  
+  geom_line(aes(y=`Variable Player Powers`), color = "blue") +
+  geom_line(aes(y=`Tile Placement`), color = "lightblue") +
+  geom_line(aes(y=`Roll / Spin and Move`), color = "violet") +
+  geom_line(aes(y=`Modular Board`), color = "purple") +
+  geom_line(aes(y=`Area Majority / Influence`), color = "pink") +
+  geom_line(aes(y=`Cooperative Game`), color = "maroon") +
+  xlim(1950,2018)
+```
+
+```{r}
+
+CountsByYears.2 = CountsByYears %>%
+  gather(`Dice Rolling`:`Selection Order Bid`, key = "Mech", value = "Count")
+CountsByYears.2[1:3800,] %>%
+  ggplot(aes(x=year, y = Count, color=Mech)) +
+  geom_line() + 
+  xlim(1950,2018)
+CountsByYears.2[1:3800,] %>%
+  ggplot(aes(x=year, y = Mech, fill=Count)) +
+  geom_tile() + 
+  xlim(1950,2018)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .70))
+```
+
+Turn count into frequency, so count of mech divided by total count for the year.
+
+```{r}
+?right_join()
+CountsByYears.3 = bg %>%
+  group_by(yearpublished) %>%
+  summarise(TotalPerYear = n()) %>%
+  right_join(CountsByYears.2, join_by(yearpublished == year)) %>%
+  mutate(Year = yearpublished, Freq = Count/TotalPerYear) %>%
+  dplyr::select(Year,Mech,Count,Freq)
+
+bg %>%
+  group_by(yearpublished) %>%
+  summarise(TotalPerYear = n()) %>%
+  ggplot(aes(x=yearpublished, y = TotalPerYear)) +
+  geom_line() + 
+  ggtitle("Total Games Published Per Year since -3500 BCE")
+
+bg %>%
+  group_by(yearpublished) %>%
+  summarise(TotalPerYear = n()) %>%
+  ggplot(aes(x=yearpublished, y = TotalPerYear)) +
+  geom_line() +
+  xlim(1950,2022) + 
+  ggtitle("Total Games Published Per Year since 1950")
+
+bg %>%
+  group_by(yearpublished) %>%
+  summarise(TotalPerYear = n())
+# 1975 is the first year with more than 3 figures number of bgs
+
+CountsByYears.3 %>%
+  subset(Mech %in% TenMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line()  + 
+  ggtitle("Frequency of Ten Most Popular Mechanics since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+CountsByYears.3 %>%
+  subset(Mech %in% TwentyMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  xlim(1975,2019)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .47))  + 
+  ggtitle("Frequency of Twenty Most Popular Mechanics since 1975")
+
+CountsByYears.3 %>%
+  subset(Mech %in% FiftyMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  xlim(1975,2019)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .47))  + 
+  ggtitle("Frequency of Fifty Most Popular Mechanics since 1975")
+
+?scale_fill_distiller
+CountsByYears.3 %>%
+  subset(Mech %in% TenMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line() + 
+  xlim(1975,2019)  + 
+  ggtitle("Frequency of Ten Most Popular Mechanics since 1975")
+```
+
+Conclusions -- **Dice Rolling** took a dip around y2k, but is still by for the most consistently popular, **Hexagon grid** was by far most popular but has been falling out since the 70's, with a short rise in popularity in mid 90's, **Hand Management** has been gaining popularity since early 2000s. **Set collection** has been gaining popularity since mid 2000s, **Roll/Spin and Move** has been overall loosing popularity since 1970s, with a small spike in late 80s. **Variable player powers** has been pretty consistent since the 70s, with a sharper gain in popularity since 2010. **Take That** has been pretty consistent since the 70s with a sharp spike in popularity since 2010~2011.**Area Majority / Influence** has also seen a spike since 2010. **Stock Holding** had two small spikes in the 80s. **Auction Bidding** saw a spike from mid 90's through 2010.
+
+Questions -- Which mechanics move together in popularity? (i.e if one mechanic goes up does another go up? does another go down?) Can we predict what mechanics will be popular in the next decade/next five years based on the previous?
+
+```{r}
+CountsByYears.3
+write_csv(CountsByYears.3, "CountsByYears.3.csv")
+```
+
+```{r}
+AvgFreqForMechAllTime = CountsByYears.3 %>%
+  group_by(Mech) %>%
+  summarise(AvgFreq = mean(Freq)) %>%
+  arrange(-AvgFreq)
+
+AvgFreqForMechSince1975 = CountsByYears.3 %>%
+  group_by(Mech) %>% 
+  filter(Year >= 1975) %>%
+  summarise(AvgFreq = mean(Freq)) %>%
+  arrange(-AvgFreq)
+
+TenMostPopMechsByF = AvgFreqForMechAllTime$Mech[1:10]
+TenMostPopMechsByF.2 = AvgFreqForMechSince1975$Mech[1:10]
+TwentyMostPopMechsByF = AvgFreqForMechAllTime$Mech[1:20]
+TwentyMostPopMechsByF.2 = AvgFreqForMechSince1975$Mech[1:20]
+FiftyMostPopMechsByF = AvgFreqForMechAllTime$Mech[1:50]
+FiftyMostPopMechsByF.2 = AvgFreqForMechSince1975$Mech[1:50]
+
+length(intersect(intersect(TenMostPopMechsByF, TenMostPopMechs), TenMostPopMechsByF.2))
+length(intersect(intersect(TwentyMostPopMechs, TwentyMostPopMechsByF), TwentyMostPopMechsByF.2))
+length(intersect(intersect(FiftyMostPopMechs, FiftyMostPopMechsByF), FiftyMostPopMechsByF.2))
+
+```
+
+```{r}
+CountsByYears.3 %>%
+  subset(Mech %in% TwentyMostPopMechsByF) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  xlim(1975,2019)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .37))  + 
+  ggtitle("Frequency of Twenty Most Popular Mechanics since 1975")
+
+CountsByYears.3 %>%
+  subset(Mech %in% FiftyMostPopMechsByF) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  xlim(1975,2019)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .37))  + 
+  ggtitle("Frequency of Fifty Most Popular Mechanics since 1975")
+
+?scale_fill_distiller
+CountsByYears.3 %>%
+  subset(Mech %in% TenMostPopMechsByF) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line() + 
+  xlim(1975,2019)  + 
+  ggtitle("Frequency of Ten Most Popular Mechanics since 1975")
+```
+
+# QUESTION 2
+
+Which mechanics lead to higher rankings? 
+
+```{r}
+bgMechRank = bg %>% dplyr::select(sortindex,usersrated,average,baverage,stddev) %>% cbind(MechanicsBinary)
+bgMechRank
+CountsByYears
+```
+
+```{r}
+bgMechRank %>%
+  ggplot(aes(x =baverage)) +
+  geom_boxplot() +
+  facet_wrap(~`Dice Rolling`, ncol=1, labeller = "label_both")
+```
+
+```{r}
+
+for(i in 7:length(colnames(bgMechRank))){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = colnames(bgMechRank)[i])
+  print(ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(colnames(bgMechRank)[i]))
+}
+```
+
+Conclusions --> 
+We can see some boxplots show more difference in the mean rank between games with and without the mechanic. As we get to the end of the many boxplots we see a lot of times a greater difference, but that can be partially attributed to the fact that mechanics near the end have a lot less observations (sometimes only 1-10 obsv.).
+Some mechanics of note --
+higher rank than without/0 -- Dice Rolling, Hand Managment, Variable Player Powers, Area Majority Influence, Action Points, Grid Movements, Worker Placements, Network and Route Building, Variable Phase Order, **Solo Solataire Games**, Communication Limits
+lower rank -- Roll/Spin and Move, Memory, Trading, Acting, Deduction, Singing
+
+
+```{r}
+
+for(i in 7:37){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = colnames(bgMechRank)[i])
+  print(ggplot(OneMechRank,aes(x =baverage)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(colnames(bgMechRank)[i]))
+}
+```
+
+NOTES -- Games with **Worker Placement**, **Network and Route Building**, have a visually higher baverage than games without it. Mechs with less games all have higher median baverages for that mechanic, because there are less low outliers (0s). 
+
+Can also look at baverage (what rank is based off of)
+
+```{r}
+AvgRankDF = data.frame(matrix(NA, 163,9))
+names(AvgRankDF) = (c("Mech","AvgRankWith","CIWith.Up","CIWith.Low","AvgRankWO","CIWo.Up","CIWo.Low","CountWith", "CountWO"))
+
+for(i in 7:length(colnames(bgMechRank))){
+  SummaryTable1 = bgMechRank %>%
+    filter((bgMechRank)[i] == 1) %>%
+    summarise(Count = n(), Avg = mean(sortindex), SD = sd(sortindex), CIU = Avg +1.96*(SD/sqrt(Count)), CIL = Avg -1.96*(SD/sqrt(Count)))
+  SummaryTable2 = bgMechRank %>%
+    filter((bgMechRank)[i] == 0) %>%
+    summarise(Count = n(), Avg = mean(sortindex), SD = sd(sortindex), CIU = Avg +1.96*(SD/sqrt(Count)), CIL = Avg -1.96*(SD/sqrt(Count)))
+  AvgRankDF[i-6,1] = colnames(bgMechRank)[i]
+  AvgRankDF[i-6,2] = SummaryTable1$Avg
+  AvgRankDF[i-6,3] = SummaryTable1$CIU
+  AvgRankDF[i-6,4] = SummaryTable1$CIL
+  AvgRankDF[i-6,5] = SummaryTable2$Avg
+  AvgRankDF[i-6,6] = SummaryTable2$CIU
+  AvgRankDF[i-6,7] = SummaryTable2$CIL
+  AvgRankDF[i-6,8] = SummaryTable1$Count
+  AvgRankDF[i-6,9] = SummaryTable2$Count
+}
+AvgRankDF %>% arrange(AvgRankWith)
+```
+
+Average rank with a mech vs without it and confidence intervals.
+  
+```{r}
+
+plot(AvgRankWith~AvgRankWO, AvgRankDF)
+
+AvgRankDiffAll = AvgRankDF %>%
+  mutate(RankDif = AvgRankWO - AvgRankWith, CIDif.Up = CIWo.Up - CIWith.Up, CIDif.Low = CIWo.Low - CIWith.Low) %>%
+  dplyr::select(Mech, RankDif,CIDif.Up,CIDif.Low, everything()) %>%
+  arrange(-RankDif)
+
+AvgRankDiff3Fig = AvgRankDF %>%
+  filter(CountWith >= 100) %>%
+  mutate(RankDif = AvgRankWO - AvgRankWith, CIDif.Up = CIWo.Up - CIWith.Up, CIDif.Low = CIWo.Low - CIWith.Low) %>%
+  dplyr::select(Mech, RankDif,CIDif.Up,CIDif.Low, everything()) %>%
+  arrange(-RankDif)
+
+AvgRankDiffAll
+AvgRankDiff3Fig
+
+AvgRankDiffAll %>%
+  ggplot(aes(x=Mech, y=RankDif, ymin = CIDif.Low, ymax = CIDif.Up)) +
+  geom_pointrange() + 
+  geom_hline(yintercept=0, linetype="dashed", color = "red")
+
+AvgRankDiffAll %>% filter(Mech == "Pattern Movement")
+
+AvgRankDiff3Fig %>%
+  ggplot(aes(x=Mech, y=RankDif, ymin = CIDif.Low, ymax = CIDif.Up)) +
+  geom_pointrange() +
+  theme(axis.text.x = element_text(angle = 90))+ 
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  geom_hline(yintercept=3500, linetype="dashed", color = "yellowgreen")
+
+TopThirtyDifAll = AvgRankDiffAll[1:30,] %>% .$Mech
+BottomThirtyDifAll = AvgRankDiffAll[134:163,] %>% .$Mech
+
+TopTenDif3Fig = AvgRankDiff3Fig[1:10,] %>% .$Mech
+BottomTenDif3Fig = AvgRankDiff3Fig[39:48,] %>% .$Mech
+```
+
+Conclusion --> The average Rank difference is typically between -5000 to 5000 among mechanics with atleast 100 games. And games with specified ranks tend to rank higher than  
+
+```{r}
+for(i in 1:length(TopThirtyDifAll)){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = TopThirtyDifAll[i])
+  print(ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(TopThirtyDifAll[i]))
+}
+
+for(i in 1:length(BottomThirtyDifAll)){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = BottomThirtyDifAll[i])
+  print(ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(BottomThirtyDifAll[i]))
+}
+```
+
+
+```{r}
+for(i in 1:length(TopTenDif3Fig)){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = TopTenDif3Fig[i])
+  print(ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(TopTenDif3Fig[i]))
+}
+
+for(i in 1:length(BottomTenDif3Fig)){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = BottomTenDif3Fig[i])
+  print(ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(BottomTenDif3Fig[i]))
+}
+```
+
+```{r}
+save.image("EDA.pt1")
+```
+

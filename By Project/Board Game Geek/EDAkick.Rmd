@@ -1,0 +1,616 @@
+---
+title: "Kick Info pt 2"
+output: html_document
+date: "2023-12-01"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(faraway)
+library(MASS)
+library(readr)
+library(rvest)
+library(curl)
+library(dplyr)
+library(forcats)
+library(lme4)
+library(pbkrtest)
+library(RLRsim)
+library(pscl)
+library(Matrix)
+library(mgcv)
+library(corrplot)
+```
+
+```{r}
+bg = read_csv("/Users/coramcanulty/Desktop/STOR 320/BG.csv")
+```
+```{r}
+RMSE.func = function(prediction, actual){
+  rmse = sqrt(sum((actual-prediction)^2)/length(prediction))
+  return(rmse)
+  }
+
+leave.one.out.RMSE = function(dat,mod,response){
+  dat$Predict = NA
+  for(i in 1:length(dat$Predict)){
+    data = dat %>% filter(!row_number() %in% c(i))
+    pred = dat[i,] %>% predict(mod,.)
+    dat$Predict[i] = pred
+    }
+  RMSE = RMSE.func(dat$Predict, response)
+  return(RMSE)
+}
+
+```
+
+
+```{r}
+ggplot(bg, aes(y=baverage))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=log(numplays)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=numplays))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+bg %>%
+  group_by(kick) %>%
+  summarise(avg.numplays = mean(numplays), med.numplays = median(numplays))
+
+ggplot(bg, aes(y=log(siteviews)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=siteviews))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+bg %>%
+  group_by(kick) %>%
+  summarise(avg.siteviews = mean(siteviews), med.numsiteviews = median(siteviews))
+
+ggplot(bg, aes(y=log(numwanting)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=numwanting))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+bg %>%
+  group_by(kick) %>%
+  summarise(avg.numwanting = mean(numwanting), med.numwanting = median(numwanting))
+
+ggplot(bg, aes(y=log(numtrading)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=numtrading))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+bg %>%
+  group_by(kick) %>%
+  summarise(avg.numtrading = mean(numtrading), med.numtrading = median(numtrading))
+
+ggplot(bg, aes(y=log(numcomments)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=numcomments))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=boardgamehonor_cnt))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=log(boardgamehonor_cnt)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+bg %>%
+  group_by(kick) %>%
+  summarise(avg.numcomments = mean(numcomments), med.numcomments = median(numcomments))
+
+```
+
+```{r}
+lmod.baverage = lm(baverage~kick, data = bg)
+lmod.numplays = lm(numplays~kick, data = bg)
+lmod.wanting = lm(numwanting~kick, data = bg)
+lmod.trading = lm(numtrading~kick, data = bg)
+lmod.siteviews = lm(siteviews~kick, data = bg)
+lmod.comments = lm(numcomments~kick, data = bg)
+
+"Baverage"
+summary(lmod.baverage)
+"Num Plays"
+summary(lmod.numplays)
+"Num Wanting"
+summary(lmod.wanting)
+"Num Trading"
+summary(lmod.trading)
+"Site Views"
+summary(lmod.siteviews)
+"Comments"
+summary(lmod.comments)
+```
+
+```{r}
+
+lmod.numplayslog = lm(log(numplays)~kick, data = bg)
+lmod.wantinglog = lm(log(numwanting+1)~kick, data = bg)
+lmod.tradinglog = lm(log(numtrading+1)~kick, data = bg)
+lmod.siteviewslog = lm(log(siteviews+1)~kick, data = bg)
+lmod.commentslog = lm(log(numcomments+1)~kick, data = bg)
+
+
+"Num Plays"
+summary(lmod.numplayslog)
+"Num Wanting"
+summary(lmod.wantinglog)
+"Num Trading"
+summary(lmod.tradinglog)
+"Site Views"
+summary(lmod.siteviewslog)
+"Comments"
+summary(lmod.commentslog)
+```
+
+```{r}
+bg %>%
+  group_by(kick) %>%
+  summarise(count = n(), mean.bavg = mean(baverage), median.bavg = median(baverage))
+```
+
+```{r}
+ggplot(bg, aes(y=avgweight))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=logtotalmedia))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+lmod.logtotalmedia = lm(logtotalmedia~kick, bg)
+summary(lmod.logtotalmedia)
+
+ggplot(bg, aes(y=boardgamemechanic_cnt))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=midplaytime))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+filter(bg, midplaytime<2500) %>%
+  ggplot(aes(y=midplaytime))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=log(midplaytime)))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=minplayers))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=maxplayers))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+filter(bg, maxplayers < 250) %>%
+  ggplot(aes(y=maxplayers))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=boardgamecategory_cnt))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+ggplot(bg, aes(y=playerage))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+```
+
+
+Fit gbm without logtotalmedia and mechanic count? See if this has any effect?
+
+```{r}
+M = bg %>%
+  dplyr::select(baverage, logtotalmedia, avgweight, boardgamemechanic_cnt, midplaytime, minplayers, maxplayers, boardgamecategory_cnt, playerage, boardgamedesigner_cnt, boardgamepublisher_cnt, boardgamehonor_cnt, boardgameartist_cnt, yearpublished, kick)
+  
+Matrix = cor(x = M$kick, y= M[1:14])
+rownames(Matrix) = "kick"
+
+corrplot(Matrix,col = COL2('PuOr'), type ="upper")
+
+S = bg %>%
+  dplyr::select(baverage, logtotalmedia, numwanting, numtrading, siteviews, numplays, numcomments, boardgamehonor_cnt, kick)
+  
+Success = cor(x = S$kick, y= S[1:8])
+rownames(Matrix) = "kick"
+
+corrplot(Success,col = COL2('PuOr'), type ="upper")
+
+
+ggplot(bg, aes(y=avgweight))+
+  geom_boxplot() +
+  facet_wrap(~kick)
+
+bg %>%
+  group_by(weightgroup,kick) %>%
+  summarise(count = n()) %>%
+  xtabs(formula = count ~ weightgroup +kick)
+
+bg %>%
+  group_by(weightgroup,kick) %>%
+  summarise(count = n())
+
+bg %>%
+  group_by(weightgroup,kick) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x=weightgroup, y = count, color=as.factor(kick))) +
+  geom_point()
+  
+ggplot(bg, aes(x = weightgroup, fill=as.factor(kick))) +
+  geom_bar(position=position_dodge())
+
+ggplot(bg, aes(x = avgweight, y=kick)) +
+  geom_point(alpha = .1)
+
+
+zeroprop = c(.002, .4567, .3754, .1415, .0241)
+oneprop = c(.0019,.3441,.4653,.1730,.0158)
+prop = c(.002,.0019, .4567,.3441, .3754,.4653, .1415,.1730, .0241,.0158)
+
+summ = bg %>%
+  group_by(weightgroup, kick) %>%
+  summarise(count = n())
+
+summ$prop = prop
+
+ggplot(summ, aes(x = weightgroup, y = prop, fill = as.factor(kick))) +
+  geom_bar(position = position_dodge(),stat = "identity")
+```
+
+```{r}
+bg$weightgrouppointfive = cut(bg$avgweight,
+    breaks = c(0,.5,1,1.5, 2,2.5, 3,3.5, 4,4.5,5),
+    include.lowest = T,
+    right = F)
+levels(bg$weightgrouppointfive) = c("0-.5",".5-1","1-1.5","1.5-2","2-2.5","2.5-3","3-3.5","3.5-4","4-4.5","4.5-5")
+
+summ2 = bg %>%
+  group_by(weightgrouppointfive, kick) %>%
+  summarise(count = n())
+
+prop2 = rep(NA, 18)
+for(i in 1:18){
+  kickk = summ2$kick[i]
+  if(kickk ==0){
+    proppp = summ2$count[i]/8125
+    prop2[i] = proppp
+  }
+    if(kickk ==1){
+    proppp = summ2$count[i]/1584
+    prop2[i] = proppp
+  }
+}
+
+summ2$prop = prop2
+
+ggplot(summ2, aes(x = weightgrouppointfive, y = prop, fill = as.factor(kick))) +
+  geom_bar(position = position_dodge(),stat = "identity") +
+  scale_fill_manual(values=c('brown2','purple4')) +
+  labs(title="XXX", 
+         x="Complexity Groups", y = "Proportion", fill = "Kickstarter?")
+```
+
+
+
+```{r}
+
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen=999)
+library(tidyverse)
+library(modelr)
+library(broom)
+library(purrr)
+library(caret)
+library(xgboost)
+library(pdp)
+```
+
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+bg2 = bg %>% filter(avgweight >= 1, midplaytime > 0, midplaytime < 1000, boardgamemechanic_cnt > 0,maxplayers !=999, boardgameartist_cnt != 508, boardgamecategory_cnt > 0)
+
+model_formula <- as.formula("baverage ~ avgweight + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model <- train(model_formula, 
+               data = bg2, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model)
+varImp(model, scale = FALSE)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight + boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model1 <- train(model_formula, 
+               data = bg, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model1)
+varImp(model1, scale = FALSE)
+
+cv<- data.matrix(bg)
+
+pdp_avgweight <- partial(
+  model1, 
+  pred.var = "avgweight", 
+  ice = TRUE, 
+  center = TRUE, 
+  plot = TRUE, 
+  rug = TRUE, 
+  alpha = 0.1, 
+  plot.engine = "ggplot2", 
+  train = cv, 
+  type = "regression"
+)
+
+pdp_mech <- partial(
+  model1, 
+  pred.var = "boardgamemechanic_cnt", 
+  ice = TRUE, 
+  center = TRUE, 
+  plot = TRUE, 
+  rug = TRUE, 
+  alpha = 0.1, 
+  plot.engine = "ggplot2", 
+  train = cv, 
+  type = "regression"
+)
+
+pdp_avgweight
+pdp_mech
+
+
+```
+
+
+
+
+
+```{r}
+ggplot(bg, aes(y=baverage)) +
+  geom_boxplot()
+
+summary(bg$baverage)
+quantile(bg$baverage, c(.1,.5,.9))
+
+top25per = bg %>% filter(baverage >= 5.935)
+bottom75per = bg %>% filter(baverage < 5.935)
+
+top10per = bg %>% filter(baverage >= 6.485)
+bottom90per = bg %>% filter(baverage < 6.485)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight + boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.high <- train(model_formula, 
+               data = top25per, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.high)
+varImp(model.high, scale = FALSE)
+```
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight + boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.high <- train(model_formula, 
+               data = top25per, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.high)
+varImp(model.high, scale = FALSE)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight + boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.low <- train(model_formula, 
+               data = bottom75per, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.low)
+varImp(model.low, scale = FALSE)
+```
+
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight + boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.highhigh <- train(model_formula, 
+               data = top10per, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.highhigh)
+varImp(model.highhigh, scale = FALSE)
+```
+
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight + boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.lowlow <- train(model_formula, 
+               data = bottom90per, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.lowlow)
+varImp(model.lowlow, scale = FALSE)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~  kick + avgweight")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.new <- train(model_formula, 
+               data = bg, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.new)
+varImp(model.new, scale = FALSE)
+
+pdp_avgweight <- partial(
+  model.new, 
+  pred.var = "avgweight", 
+  ice = TRUE, 
+  center = TRUE, 
+  plot = TRUE, 
+  rug = TRUE, 
+  alpha = 0.1, 
+  plot.engine = "ggplot2", 
+  train = cv, 
+  type = "regression"
+)
+pdp_avgweight
+```
+
+```{r}
+bg.yearfix = bg %>%
+  filter(yearpublished >=2009)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("baverage ~ avgweight +boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.year <- train(model_formula, 
+               data = bg.yearfix, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.year)
+varImp(model.year, scale = FALSE)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("numwanting ~ avgweight +boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.numwanting <- train(model_formula, 
+               data = bg, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.numwanting)
+varImp(model.numwanting, scale = FALSE)
+```
+
+```{r,warning=F}
+set.seed(154)
+
+train_control <- trainControl(method = "cv", number = 20)
+
+model_formula <- as.formula("siteviews ~ avgweight +boardgamemechanic_cnt + midplaytime + playerage + maxplayers + boardgamecategory_cnt + kick + minplayers")
+
+xgb_grid <- expand.grid(nrounds = 10000, max_depth = 3, eta = 0.01, gamma = 0.02, colsample_bytree = 0.6, min_child_weight = 1, subsample = 0.7)
+
+model.siteviews <- train(model_formula, 
+               data = bg, 
+               method = "xgbTree", 
+               trControl = train_control, 
+               tuneGrid = xgb_grid) 
+
+print(model.siteviews)
+varImp(model.siteviews, scale = FALSE)
+```
+

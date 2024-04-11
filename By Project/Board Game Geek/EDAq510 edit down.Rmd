@@ -1,0 +1,292 @@
+---
+title: "EDA q 5 10"
+output: html_document
+date: '2023-10-30'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(faraway)
+library(MASS)
+library(readr)
+library(rvest)
+library(curl)
+library(dplyr)
+```
+
+```{r}
+bg = read_csv("boardgames1.csv")
+bg
+```
+
+# QUESTION 1
+
+Are certain mechanics more prevalent in certain years? What mechanics have been most common (and favorable) throughout the years? Are there observable ‘phases’ in the board game community? 
+
+```{r}
+# Scrape list of all mechs
+
+URL.mech="https://boardgamegeek.com/browse/boardgamemechanic"
+
+AllMechanicsBad = URL.mech %>%
+  read_html() %>%
+  html_table(fill=TRUE) %>%
+  .[[1]]
+AllMechanics = stack(AllMechanicsBad) %>% arrange(values) %>% filter( values != "") %>% .$values
+```
+
+```{r}
+# Create matrix that counts Number of observances of each mechanic
+
+#Below is the code I wrote to do this, don't run, takes too long, import data frame 
+#  mechlist = bg$boardgamemechanic
+#  MechCount = c(rep(0, length(AllMechanics)))
+#  for(i in 1:length(mechlist)){
+#    list = mechlist[i]
+#    for(j in 1:length(AllMechanics)){
+#      if(str_detect(list,AllMechanics[j]) == T){
+#        MechCount[j] = MechCount[j] +1
+#      }
+#    }
+#  }
+#  Countdf = data.frame(AllMechanics, MechCount)
+
+Countdf = read_csv("Countdf.csv")
+TenMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:10]
+FiftyMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:50]
+TwentyMostPopMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:20]
+AllNonZeroMechs = Countdf %>% arrange(-MechCount)%>% .$AllMechanics %>% .[1:163]
+head(Countdf)
+```
+
+```{r}
+#Create a Binary Matrix, where each game row has a column for each mechanic and 1 = the game has that mechanic and 0 = the game does not have that mechanic
+
+#Below is the code I wrote to do this, don't run, takes too long, import data frame 
+#  MechanicsBinary = data.frame(matrix(NA, length(mechlist),164))
+#  names(MechanicsBinary) = (c("name",AllNonZeroMechs))
+#  games = bg$name
+#
+#  for(i in 1:length(mechlist)){
+#    list2 = mechlist[i]
+#    MechanicsBinary[i,1] = games[i]
+#    for(j in 1:length(AllNonZeroMechs)){
+#      if(str_detect(list2,AllNonZeroMechs[j]) == T){
+#        MechanicsBinary[i,j+1] = 1
+#      }else{
+#        MechanicsBinary[i,j+1] = 0
+#      }
+#    }
+#    print(i)
+#  }
+
+MechanicsBinary = read_csv("MechanicsBinary.csv")
+bgNameYearMech = bg %>% dplyr::select(yearpublished) %>% cbind(MechanicsBinary)
+head(bgNameYearMech)
+```
+
+```{r}
+#Create a Matrix with Number of observences of each mech in each year and then gather to make it easier to graph
+
+CountsByYears = data.frame(matrix(NA, 190,length(bgNameYearMech)-1))
+names(CountsByYears) = c("year", colnames(bgNameYearMech)[3:length(bgNameYearMech)])
+
+for(i in 3:length(colnames(bgNameYearMech))){
+  ivar = rlang::sym(colnames(bgNameYearMech)[i])
+  summary = bgNameYearMech %>%
+  group_by(yearpublished) %>%
+  summarise(Count = sum(!! ivar))
+  if(i ==3){
+    CountsByYears$year = summary$yearpublished
+    CountsByYears[i-1] = summary$Count
+  }else{
+    CountsByYears[i-1] = summary$Count
+  }
+}
+
+head(CountsByYears)
+
+CountsByYears.2 = CountsByYears %>%
+  gather(`Dice Rolling`:`Selection Order Bid`, key = "Mech", value = "Count")
+
+head(CountsByYears.2)
+
+```
+
+```{r}
+#First Graph, Counts don't work well because many more games came out in the later years, so this graph looks like all mechanics are getting more common, which doesn't tell us anything
+
+CountsByYears.2[1:3800,] %>%
+  ggplot(aes(x=year, y = Mech, fill=Count)) +
+  geom_tile() + 
+  xlim(1950,2018)+
+  scale_fill_distiller(palette = "YlGn", direction=2)+ 
+  ggtitle("Number of Games with Mech each year since 1950")
+```
+
+```{r}
+#Lets look at Frequency instead of count
+
+CountsByYears.3 = bg %>%
+  group_by(yearpublished) %>%
+  summarise(TotalPerYear = n()) %>%
+  right_join(CountsByYears.2, join_by(yearpublished == year)) %>%
+  mutate(Year = yearpublished, Freq = Count/TotalPerYear) %>%
+  dplyr::select(Year,Mech,Count,Freq)
+
+CountsByYears.3 %>%
+  subset(Mech %in% TenMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line()  + 
+  ggtitle("Frequency of Ten Most Common Mechanics since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+# 1975 is the first year with more than 100 bgs
+
+CountsByYears.3 %>%
+  subset(Mech %in% TwentyMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  xlim(1975,2019)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .47))  + 
+  ggtitle("Frequency of Twenty Most Common Mechanics since 1975")
+
+CountsByYears.3 %>%
+  subset(Mech %in% FiftyMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Mech, fill=Freq)) +
+  geom_tile() + 
+  xlim(1975,2019)+
+  scale_fill_distiller(palette = "YlGn", direction=2, 
+                       values = c(0, .47))  + 
+  ggtitle("Frequency of Fifty Most Common Mechanics since 1975")
+
+CountsByYears.3 %>%
+  filter(Year >= 1975, Year <= 2019) %>%
+  subset(Mech %in% TenMostPopMechs) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line()  + 
+  ggtitle("Frequency of Ten Most Common Mechanics since 1975")
+```
+
+Conclusions --> Yes, certain mechanics are more prevalent in certain years. **Dice Rolling** has been the most consistent game mechanic, taking a small dip around 2000. **Hexagon grid** was by far the most common but has been falling out since the 70's, with a short rise in popularity in mid 90's.**Roll/Spin and Move** was fairly common but has been overall loosing prevalence since 1970s. **Hand Management** has been gaining prevalence since early 2000s, and is now one of the most common. **Set collection** has been gaining since mid 2000s. **Variable player powers** saw a sharper gain in prevalence since 2010. **Take That** has seen a sharp spike in prevalence since around 2012. **Area Majority / Influence** has also seen a spike since 2010. **Stock Holding** had two small spikes in the 80s. **Auction Bidding** saw a spike from mid 90's through 2010.
+
+# QUESTION 2
+
+Which mechanics lead to higher rankings? 
+
+```{r}
+#Create a matrix with our Mechanics and with rank
+
+bgMechRank = bg %>% dplyr::select(sortindex,usersrated,average,baverage,stddev) %>% cbind(MechanicsBinary)
+```
+
+```{r}
+#Create a data frame with Average Rank for games with mech vs average rank for games without the Mech.
+
+AvgRankDF = data.frame(matrix(NA, 163,9))
+names(AvgRankDF) = (c("Mech","AvgRankWith","CIWith.Up","CIWith.Low","AvgRankWO","CIWo.Up","CIWo.Low","CountWith", "CountWO"))
+
+for(i in 7:length(colnames(bgMechRank))){
+  SummaryTable1 = bgMechRank %>%
+    filter((bgMechRank)[i] == 1) %>%
+    summarise(Count = n(), Avg = mean(sortindex), SD = sd(sortindex), CIU = Avg +1.96*(SD/sqrt(Count)), CIL = Avg -1.96*(SD/sqrt(Count)))
+  SummaryTable2 = bgMechRank %>%
+    filter((bgMechRank)[i] == 0) %>%
+    summarise(Count = n(), Avg = mean(sortindex), SD = sd(sortindex), CIU = Avg +1.96*(SD/sqrt(Count)), CIL = Avg -1.96*(SD/sqrt(Count)))
+  AvgRankDF[i-6,1] = colnames(bgMechRank)[i]
+  AvgRankDF[i-6,2] = SummaryTable1$Avg
+  AvgRankDF[i-6,3] = SummaryTable1$CIU
+  AvgRankDF[i-6,4] = SummaryTable1$CIL
+  AvgRankDF[i-6,5] = SummaryTable2$Avg
+  AvgRankDF[i-6,6] = SummaryTable2$CIU
+  AvgRankDF[i-6,7] = SummaryTable2$CIL
+  AvgRankDF[i-6,8] = SummaryTable1$Count
+  AvgRankDF[i-6,9] = SummaryTable2$Count
+}
+
+head(AvgRankDF)
+```
+
+```{r}
+#Create DF with difference between between Average Rank with Mech vs Average Rank without Mech. Then Plot the differences for each mech with confidence intervals.
+
+AvgRankDiffAll = AvgRankDF %>%
+  mutate(RankDif = AvgRankWO - AvgRankWith, CIDif.Up = CIWo.Up - CIWith.Up, CIDif.Low = CIWo.Low - CIWith.Low) %>%
+  dplyr::select(Mech, RankDif,CIDif.Up,CIDif.Low, everything()) %>%
+  arrange(-RankDif)
+
+AvgRankDiff3Fig = AvgRankDF %>%
+  filter(CountWith >= 100) %>%
+  mutate(RankDif = AvgRankWO - AvgRankWith, CIDif.Up = CIWo.Up - CIWith.Up, CIDif.Low = CIWo.Low - CIWith.Low) %>%
+  dplyr::select(Mech, RankDif,CIDif.Up,CIDif.Low, everything()) %>%
+  arrange(-RankDif)
+
+AvgRankDiffAll %>%
+  ggplot(aes(x=Mech, y=RankDif, ymin = CIDif.Low, ymax = CIDif.Up)) +
+  geom_pointrange() + 
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  ggtitle("Difference in Average Rank for Board Games with vs without a 
+          Mechanic with 95% Confidence Intervals")+
+  labs(caption = "Some Mechanics had as few as 2 games with that mechanic 
+       in the data set, so these games are gonna have typically a larger 
+       difference and a larger confidence interval")
+
+#The point with the largest Confidence Interval
+
+AvgRankDiffAll %>% filter(Mech == "Pattern Movement")
+
+AvgRankDiff3Fig %>%
+  ggplot(aes(x=Mech, y=RankDif, ymin = CIDif.Low, ymax = CIDif.Up)) +
+  geom_pointrange() +
+  theme(axis.text.x = element_text(angle = 90, size = 4))+ 
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  ggtitle("Difference in Average Rank for Board Games with vs without a 
+          Mechanic with 95% Confidence Intervals")+
+  labs(caption = "Only for mechanics with at least 100 games")
+```
+
+```{r}
+#Lets look at some boxplots with Average Rank for Games with a Mechanic vs without that mechanic, but just for the 5 Mechanics with the most Positive differnce and the 5 with the most negative Difference, among the Mechanics with at least 100 games
+
+TopTenDif3Fig = AvgRankDiff3Fig[1:10,] %>% .$Mech
+BottomTenDif3Fig = AvgRankDiff3Fig[39:48,] %>% .$Mech
+
+#Most Pos Difference
+
+plist = list()
+for(i in 1:5){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = TopTenDif3Fig[i])
+    p = ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(TopTenDif3Fig[i])
+    plist[[i]] = p
+}
+
+gridExtra::grid.arrange(plist[[1]],plist[[2]],plist[[3]], ncol =1)
+
+#Most Neg Difference
+
+for(i in 1:5){
+  OneMechRank = bgMechRank %>%
+    dplyr::select(sortindex,usersrated,average,baverage,stddev, Mech = BottomTenDif3Fig[i+5])
+  print(ggplot(OneMechRank,aes(x =sortindex)) +
+          geom_boxplot() +
+          facet_wrap(~Mech, ncol=1, labeller = "label_both") +
+          ggtitle(BottomTenDif3Fig[i+5]))
+}
+```
+
+
+Conclusions --> The average Rank difference is typically between -5000 to 5000 among mechanics with atleast 100 games. Most average rank difference confidence intervals are not overlapping 0, so that implies that mechanics do have an effect on the ranking of the game.   
+The two mechanics with the greatest average rank difference (when taking count into acount) is **Solo/Solitaire Games** (positive difference) and **Roll/Spin and Move** (negative difference). This makes sense becuase according to BGG "[The term Roll/Spin and Move] is often used derogatorily to imply that there is no thought involved.". Many games that have the Solo/Solitaire Games mechanic have options to play as single player or with a group. These types of games maybe more popular on BGG because the average board game geek could have a hard time finding people to play with.
+Other Mechanics with a fairly large positive effect on the average ranking - **Worker Placement**, **Network and Route Building**, **Area Majority / Influence**, **Variable Phase Order**, **Grid Movement**, **Action Queue**, **Action Points**, **Variable Player Powers**, **Campaign/Battle Card Driven**
+Other Mechanics with a fairly large negative effect on the average ranking - **Deduction**, **Trading**, **Rock-Paper-Scissors**, **Betting and Bluffing**
+
+```{r}
+bg$boardgamemechanic[1]
+```

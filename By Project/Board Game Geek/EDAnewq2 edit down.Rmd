@@ -1,0 +1,168 @@
+---
+title: "EDAnewq2"
+output: html_document
+date: '2023-11-01'
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ggplot2)
+library(faraway)
+library(MASS)
+library(readr)
+library(rvest)
+library(curl)
+library(dplyr)
+```
+
+
+QUESTION -- Which years produced higher rankings or baverages (user rating)? Are there any trends? Rating inflation/deflation?
+
+```{r}
+bg = read_csv("/Users/coramcanulty/Desktop/STOR 320/boardgames1.csv")
+bg
+```
+
+```{r}
+#Find summary statistics for Ranking for each year
+
+AvgRankYear = bg %>%
+  group_by(yearpublished) %>%
+  summarise(AvgRank = mean(sortindex), StdDev = sd(sortindex), Count = n(), CI.Up = AvgRank + 1.96*(StdDev/sqrt(Count)) , CI.Low =AvgRank - 1.96*(StdDev/sqrt(Count)) )
+
+head(AvgRankYear)
+```
+
+```{r}
+#Create Graphs
+
+AvgRankYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRank)) +
+  geom_line() + 
+  ggtitle("Average Rank of Games vs Year since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+AvgRankYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRank)) +
+  geom_line() +
+  xlim(1975,NA) +
+  ylim(6000, 15000) + 
+  ggtitle("Average Rank of Games vs Year since 1975 CE") +
+  labs(caption = "Note -- Lower Rank = Better")
+
+AvgRankYear %>% 
+  filter(Count >= 100, yearpublished != 0) %>%
+  ggplot(aes(x = yearpublished, y = AvgRank, ymin = CI.Low, ymax = CI.Up)) +
+  geom_pointrange()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) +
+  geom_vline(xintercept=2008, linetype="dashed", color = "red", alpha = .4) +
+  ggtitle("Average Rank of Games vs Year since 1975 CE with 95% Confidence Intervals") +
+  labs(caption = "Note -- Lower Rank = Better")
+```
+
+Conclusions --> There seems to be a large shift (about 2500 spots) towards more positive rankings in 2003, and a little bit of a shift in 2008, but definitly not as large (about 1000 spots). Overall the rankings seem to favor newer games. Before 2003 the average rankings kind of fluctuated on a wave like shape.  
+
+```{r}
+#Find summary statistics for Rating (baverage) for each year
+
+AvgRatingYear = bg %>%
+  group_by(yearpublished) %>%
+  summarise(AvgRating = mean(baverage), StdDev = sd(baverage), Count = n(), CI.Up = AvgRating + 1.96*(StdDev/sqrt(Count)) , CI.Low =AvgRating - 1.96*(StdDev/sqrt(Count)) )
+
+head(AvgRatingYear)
+```
+
+```{r}
+#Create Graphs
+
+AvgRatingYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRating)) +
+  geom_line() + 
+  ggtitle("Average Rating of Games vs Year since -3500 BCE") +
+  labs(caption = "demonstrates why we want to limit our plot to years where many games came out")
+
+AvgRatingYear %>% 
+  ggplot(aes(x = yearpublished, y = AvgRating)) +
+  geom_line() +
+  xlim(1975,NA) + 
+  ggtitle("Average Rating of Games vs Year since 1975 CE")
+
+AvgRatingYear %>% 
+  filter(Count >= 100, yearpublished != 0) %>%
+  ggplot(aes(x = yearpublished, y = AvgRating, ymin = CI.Low, ymax = CI.Up)) +
+  geom_pointrange()+ 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Average Rating of Games vs Year since 1975 CE with 95% Confidence Intervals")
+
+```
+
+Conclusions --> Since baverage is the way that rankings are ordered we expected to see the same sort of information in this graph, and we do. There is again this wave shape before 2003, and then a large shift around 2003, jumping about 1 point up in average ratings. The confidence intervals also get a lot smaller after 2003, probably because a lot more games were coming out each year. We don't see a shift really in 2008 in this graph. Again, overall ratings seem to be getting more positive, and seem to still be on this trend. BGG users seem to favor newer games.
+
+```{r}
+#Lets use some previous info about mechanics to try and see why there was a shift in 2003
+
+MechBinary = read_csv("/Users/coramcanulty/Desktop/STOR 320/MechanicsBinary.csv",show_col_types = FALSE)
+MechCountsByYears.3 = read_csv("/Users/coramcanulty/Desktop/STOR 320/CountsByYears.3.csv",show_col_types = FALSE)
+MechCountdf = read_csv("/Users/coramcanulty/Desktop/STOR 320/Countdf.csv",show_col_types = FALSE)
+
+MechMostEffectRank = c("Solo / Solitaire Game","Worker Placement","Network and Route Building","Area Majority / Influence","Variable Phase Order","Grid Movement","Action Queue","Action Points","Variable Player Powers","Campaign / Battle Card Driven")
+MechMostNegEffectRank = c("Line Drawing","Trick-taking","Pattern Recognition", "Memory","Acting","Betting and Bluffing","Rock-Paper-Scissors","Trading","Deduction","Roll / Spin and Move")
+```
+
+```{r}
+#Create Graphs
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% MechMostEffectRank) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Frequency of Ten Mechanics that most Positivly effect ranking 
+          vs Years since 1975")
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% MechMostNegEffectRank) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Frequency of Ten Mechanics that most Negativley effect ranking 
+          vs Years since 1975")
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% c("Worker Placement","Grid Movement","Variable Player Powers","Area Majority / Influence")) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  geom_vline(xintercept=2008, linetype="dashed", color = "red", alpha = .4) +
+  ggtitle("Frequency of Mechanics vs Years since 1975") +
+  labs(caption = "Looking specifically for a positive shift around 2003")
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% c("Trading", "Roll / Spin and Move")) %>%
+  ggplot(aes(x=Year, y = Freq, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  ylim(0,.2) +
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Frequency of Mechanics vs Years since 1975") +
+  labs(caption = "Looking specifically for a negative shift around 2003")
+
+MechCountsByYears.3 %>%
+  filter(Mech %in% c("Roll / Spin and Move")) %>%
+  ggplot(aes(x=Year, y = Count, color=Mech)) +
+  geom_line(alpha = .75) + 
+  xlim(1975,2019)  + 
+  geom_vline(xintercept=2003, linetype="dashed", color = "red", alpha = .4) + 
+  ggtitle("Count of Mechanics vs Years since 1975") +
+  labs(caption = "Looking specifically for a negative shift around 2003")
+```
+
+Conclusions --> Looking at the mechanics that we know are associated with better rankings from question 10, three seem to have some shift around 2003: **Area Majority / Influence**, **Grid Movement**, and **Worker Placement**. An increase in games with these mechanics could be responsible for the big jump in rankings. **Variable Player Powers** also saw a big shift around 2008. This could be responsible for the 2008 shift in rankings. Looking at mechanics that we know are associated with worse rankings, we see a huge shift in **Roll / Spin and Move** games around 2003. Knowing what we know about how much games with this mechanic are hated and how big of an effect this mechanic has on rankings we can assume that the positive shift in rankings in 2003 was at least partially associated with the plumet in prevalence of 'Roll / Spin and Move' games. We can also see that there wasn't just less 'Roll / Spin and Move' games relatively in the whole board game landscape after 2003, the actual number of 'Roll / Spin and Move' games was dropping.
+
