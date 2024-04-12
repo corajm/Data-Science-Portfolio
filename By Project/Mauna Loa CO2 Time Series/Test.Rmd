@@ -1,0 +1,145 @@
+---
+title: "Proj Work"
+output: html_document
+date: "2024-04-06"
+---
+
+```{r setup, include=FALSE}
+library(itsmr)
+library(stats)
+```
+
+```{r}
+mauloa = scan("/Users/coramcanulty/Desktop/556 group prj/maunaloa201404_202403.tsm")
+plotc(mauloa)
+```
+
+```{r}
+mauloa.s = season(mauloa, 12)
+mauloa.elim.s = mauloa - mauloa.s
+acf(mauloa.elim.s,lag.max=40,type="correlation",plot=TRUE)
+plotc(mauloa.elim.s)
+```
+
+```{r}
+mauloa.m = trend(mauloa.elim.s,1)
+mauloa.elim.s.m = mauloa - mauloa.s - mauloa.m
+acf(mauloa.elim.s.m,lag.max=40,type="correlation",plot=TRUE)
+plotc(mauloa.elim.s.m)
+test(mauloa.elim.s.m)
+```
+
+```{r}
+model.AR14MA1 = arma(Resid(mauloa.elim.s.m), p =13, q=1)
+plota(mauloa.elim.s.m, model.AR14MA1)
+M = c("season", 12, "trend", 1)
+test(Resid(mauloa, M, model.AR14MA1))
+```
+
+
+```{r}
+### Forecast
+mauloa.feb = scan("/Users/coramcanulty/Desktop/556 group prj/maunaloa201403_202402.tsm")
+
+model.feb.AR14MA1 = arma(Resid(mauloa, M), p =13, q=1)
+
+fcast = forecast(mauloa.feb,M,model.feb.AR14MA1,h=1,opt=2)
+mod141 = mauloa[120] - fcast$pred
+
+mod102
+mod141
+```
+
+```{r MAE error}
+residv = rep(NA, 10)
+for(i in 1:10){
+  traini = length(mauloa)-i
+  trainbeg = 11-i
+  train = mauloa[trainbeg:traini]
+  predi = i-1
+  true = mauloa[length(mauloa)-predi]
+  
+  fit= c("season", 12, "trend", 1)
+  model = arma(Resid(train, fit), p = 13, q=1)
+  
+  fc = forecast(train, fit, model, h=1, opt=1)
+  pred = fc$pred
+
+  residv[i] = true-pred
+}
+
+MAE = sum(abs(residv))/10
+MAE
+
+```
+
+```{r MAE error}
+
+ppos = c(10,11,12,13,14)
+
+MAE = rep(NA, 5)
+
+for( j in 1:5){
+  print(j)
+  
+  p = ppos[j]
+  q = 4
+  
+
+  residv = rep(NA, 10)
+  
+  for(i in 1:10){
+    traini = length(mauloa)-i
+    trainbeg = 11-i
+    train = mauloa[trainbeg:traini]
+    predi = i-1
+    true = mauloa[length(mauloa)-predi]
+  
+    fit= c("season", 12, "trend", 1)
+    model = arma(Resid(train, fit), p = p, q=q)
+  
+    fc = forecast(train, fit, model, h=1, opt=0)
+    pred = fc$pred
+
+    residv[i] = true-pred
+  }
+
+  MAE.round = sum(abs(residv))/10
+  MAE[j] = MAE.round
+}
+
+cbind(MAE, ppos)
+
+?tryCatch
+
+```
+
+```{r}
+
+setsize = c(118, 110, 100, 90, 80, 70)
+residv = rep(NA, 6)
+
+for(i in 1:6){
+  j =setsize[i]
+  begi = 119-j
+  
+  train = mauloa[begi:119]
+  true = mauloa[120]
+  
+  fit= c("season", 12, "trend", 1)
+  model = arma(Resid(train, fit), p = 13, q=1)
+  
+  fc = forecast(train, fit, model, h=1, opt=1)
+  pred = fc$pred
+  resid = true-pred
+  residv[i] = resid
+  
+}
+cbind(residv, setsize)
+
+```
+
+
+```{r}
+autofit(Resid(mauloa, M), p =10:13, q=0:9)
+```
