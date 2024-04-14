@@ -1,0 +1,337 @@
+---
+title: "Stacy NYT test"
+output: html_notebook
+---
+
+This is mostly testing...
+
+```{r}
+library(readr)
+library(stringr)
+library(dplyr)
+library(ggplot2)
+library(tidyr)
+monthly_ama = read_csv("/Users/coramcanulty/Desktop/NumbersTagsWeeks-weekly1523 for R.csv")
+
+head(monthly_ama)
+```
+
+```{r}
+
+monthly_ama_clean = na.omit(monthly_ama)
+
+head(monthly_ama_clean)
+
+```
+
+```{r}
+
+ama_mod1=lm(Weeks~LovableChar, data=monthly_ama_clean)
+ama_mod1
+
+```
+```{r}
+plot(Weeks~DiverseChar, data=monthly_ama_clean)
+#abline(ama_mod1)
+
+
+
+```
+
+
+```{r}
+
+all_ama = read_csv("/Users/coramcanulty/Desktop/Stacy NYT python proj./csv/ALL MG 1523/All_MG_Amapages.csv")
+
+all_ama$clean_categories = NA
+  
+for(i in 1:3723){
+  categories = (all_ama$categories[i])
+  cat2 = str_sub(categories,3,-3)
+  type = 0
+  if(length(strsplit(cat2, split = "in ")[[1]]) == 4) {
+    cats_v = strsplit(cat2, split = "in ")[[1]]
+    type = type +1
+  } else if(length(strsplit(cat2, split = ",")[[1]]) == 3){
+    cats_v = strsplit(cat2, split = ",")[[1]]
+    type = type +2
+  } else if(length(strsplit(cat2, split = "in ")[[1]]) == 3) {
+    cats_v = strsplit(cat2, split = "in ")[[1]]
+    type = type +3
+  } else if(length(strsplit(cat2, split = ",")[[1]]) == 2){
+    cats_v = strsplit(cat2, split = ",")[[1]]
+    type = type +4
+  } else{
+    cats_v = NA
+  }
+  
+  cleancats = rep(NA,2)
+  
+  if(type ==1){
+    for(j in 1:4){
+      curcat = cats_v[j]
+      if(j == 2 | j == 3){
+        curcat2 = str_sub(curcat,1,-5)
+        cleancats[j-1] = curcat2
+      } else if(j ==4){
+        cleancats[j-1] = curcat
+      }
+    }
+  } else if(type == 2){
+    for(j in 1:3){
+      curcat = cats_v[j]
+      if(j == 1){
+        curcat3 = str_sub(curcat,4,-3)
+        cleancats[j] = curcat3
+      } else if(j ==2){
+        curcat3 = str_sub(curcat,6,-2)
+        cleancats[j] = curcat3
+      } else if(j ==3){
+        curcat3 = str_sub(curcat,6,-1)
+        cleancats[j] = curcat3
+      }
+    }
+  }else if(type ==3){
+    for(j in 1:3){
+      curcat = cats_v[j]
+      if(j == 2){
+        curcat2 = str_sub(curcat,1,-5)
+        cleancats[j-1] = curcat2
+      } else if(j ==3){
+        cleancats[j-1] = curcat
+      }
+    }
+  }else if(type ==4){
+    for(j in 1:2){
+      curcat = cats_v[j]
+      if(j == 1){
+        curcat3 = str_sub(curcat,4,-3)
+        cleancats[j] = curcat3
+      } else if(j ==2){
+        curcat3 = str_sub(curcat,6,-1)
+        cleancats[j] = curcat3
+      }
+    }
+  }else if(type == 0){
+    cleancats = NA
+  }
+  
+  cleancats.v = as.data.frame(cleancats)
+  all_ama$clean_categories[i] = cleancats.v
+  
+
+}
+
+which(is.na(all_ama$clean_categories), arr.ind=TRUE)
+
+```
+
+```{r}
+
+all_cats = c()
+
+for(i in 1:3723){
+  cat_list = all_ama$clean_categories[[i]]
+  end = length(cat_list)
+  for(k in 1:end){
+    all_cats = c(all_cats, cat_list[k])
+  }
+}
+
+unique_cats = unique(all_cats)
+
+cat_binary_df = data.frame(matrix(0, length(all_ama$clean_categories),length(unique_cats)+1))
+
+names(cat_binary_df) = (c("title",unique_cats))
+cat_binary_df$title = all_ama$title
+
+nas = which(is.na(all_ama$clean_categories), arr.ind=TRUE)
+all_ama.clean = all_ama[,-1] %>% .[-nas,]
+
+
+for(i in 1:length(all_ama.clean$clean_categories)){
+  list = all_ama.clean$clean_categories[[i]]
+  for(k in 1:length(list)){
+    cat = list[k]
+    out = lapply(unique_cats, grepl, pattern=cat, fixed = T)
+    for(j in 1:length(out)){
+      if(out[[j]] == TRUE){
+        cat_binary_df[i,j+1] = out[[j]]
+      }
+    }
+  }
+}
+
+```
+
+```{r}
+cat_count = colSums(cat_binary_df[,2:732])
+all_count = as.data.frame(cat_count) %>% 
+  arrange(-cat_count) %>%
+  mutate(prop = cat_count/length(all_ama.clean$clean_categories))
+```
+
+```{r}
+### for nyt
+weekly_ama = read_csv("/Users/coramcanulty/Desktop/Stacy NYT python proj./csv/WEEKLY MG/Amazon/Ama-TagsMore-weekly1523 for biglist.csv")
+weekly_ama
+
+
+for(i in 1:length(weekly_ama$categories)){
+  categories = (weekly_ama$categories[i])
+  cat2 = str_sub(categories,3,-3)
+  type = 0
+  if(length(strsplit(cat2, split = "in ")[[1]]) == 4) {
+    cats_v = strsplit(cat2, split = "in ")[[1]]
+    type = type +1
+  } else if(length(strsplit(cat2, split = ",")[[1]]) == 3){
+    cats_v = strsplit(cat2, split = ",")[[1]]
+    type = type +2
+  } else if(length(strsplit(cat2, split = "in ")[[1]]) == 3) {
+    cats_v = strsplit(cat2, split = "in ")[[1]]
+    type = type +3
+  } else if(length(strsplit(cat2, split = ",")[[1]]) == 2){
+    cats_v = strsplit(cat2, split = ",")[[1]]
+    type = type +4
+  } else{
+    cats_v = NA
+  }
+  
+  cleancats = rep(NA,2)
+  
+  if(type ==1){
+    for(j in 1:4){
+      curcat = cats_v[j]
+      if(j == 2 | j == 3){
+        curcat2 = str_sub(curcat,1,-5)
+        cleancats[j-1] = curcat2
+      } else if(j ==4){
+        cleancats[j-1] = curcat
+      }
+    }
+  } else if(type == 2){
+    for(j in 1:3){
+      curcat = cats_v[j]
+      if(j == 1){
+        curcat3 = str_sub(curcat,4,-3)
+        cleancats[j] = curcat3
+      } else if(j ==2){
+        curcat3 = str_sub(curcat,6,-2)
+        cleancats[j] = curcat3
+      } else if(j ==3){
+        curcat3 = str_sub(curcat,6,-1)
+        cleancats[j] = curcat3
+      }
+    }
+  }else if(type ==3){
+    for(j in 1:3){
+      curcat = cats_v[j]
+      if(j == 2){
+        curcat2 = str_sub(curcat,1,-5)
+        cleancats[j-1] = curcat2
+      } else if(j ==3){
+        cleancats[j-1] = curcat
+      }
+    }
+  }else if(type ==4){
+    for(j in 1:2){
+      curcat = cats_v[j]
+      if(j == 1){
+        curcat3 = str_sub(curcat,4,-3)
+        cleancats[j] = curcat3
+      } else if(j ==2){
+        curcat3 = str_sub(curcat,6,-1)
+        cleancats[j] = curcat3
+      }
+    }
+  }else if(type == 0){
+    cleancats = NA
+  }
+  
+  cleancats.v = as.data.frame(cleancats)
+  weekly_ama$clean_categories[i] = cleancats.v
+  
+
+}
+
+which(is.na(weekly_ama$clean_categories), arr.ind=TRUE)
+
+
+
+all_cats_weekly = c()
+
+for(i in 1:length(weekly_ama$clean_categories)){
+  cat_list = weekly_ama$clean_categories[[i]]
+  end = length(cat_list)
+  for(k in 1:end){
+    all_cats_weekly = c(all_cats_weekly, cat_list[k])
+  }
+}
+
+unique_cats_weekly = unique(all_cats_weekly)
+
+cat_binary_df_weekly = data.frame(matrix(0, length(weekly_ama$clean_categories),length(unique_cats_weekly)+1))
+
+names(cat_binary_df_weekly) = (c("title",unique_cats_weekly))
+cat_binary_df_weekly$title = weekly_ama$title
+
+nas = which(is.na(weekly_ama$clean_categories), arr.ind=TRUE)
+weekly_ama.clean = weekly_ama[-nas,]
+
+
+for(i in 1:length(weekly_ama.clean$clean_categories)){
+  list = weekly_ama.clean$clean_categories[[i]]
+  for(k in 1:length(list)){
+    cat = list[k]
+    out = lapply(unique_cats_weekly, grepl, pattern=cat, fixed = T)
+    for(j in 1:length(out)){
+      if(out[[j]] == TRUE){
+        cat_binary_df_weekly[i,j+1] = out[[j]]
+      }
+    }
+  }
+}
+
+cat_binary_df_weekly$weeks = weekly_ama$Weeks
+
+cat_count_weekly = colSums(cat_binary_df_weekly[,2:216])
+bs_count = as.data.frame(cat_count_weekly) %>% 
+  arrange(-cat_count_weekly) %>%
+  mutate(prop_weekly = cat_count_weekly/length(weekly_ama.clean$clean_categories))
+
+bs_count <- cbind(rownames(bs_count), bs_count)
+rownames(bs_count) <- NULL
+colnames(bs_count) <- c("cats", "cat_count_weekly", "prop_weekly")
+
+all_count <- cbind(rownames(all_count), all_count)
+rownames(all_count) <- NULL
+colnames(all_count) <- c("cats", "cat_count", "prop")
+```
+
+```{r}
+full_counts = full_join(bs_count,all_count, by=join_by(cats))
+full_counts_long = full_counts %>%
+  select(cats, prop_weekly, prop) %>%
+  gather(key="BS", value="prop", 2:3)
+
+
+use = rbind(full_counts_long[1:10,], full_counts_long[780:789,])
+level_order <- c("Children's Action & Adventure Books (Books)", "Children's Fantasy & Magic Books", "Children's Friendship Books","Children's Mystery, Detective, & Spy","Children's Black & African American Story Books","Children's Books on Emotions & Feelings (Books)","Children's Self-Esteem Books","Children's Books on Prejudice & Racism","Children's Humorous Comics & Graphic Novels","Children's Books on Girls' & Women's Issues")
+
+
+
+
+ggplot(use) +
+  geom_col(aes(x=factor(cats, levels=level_order), y=prop, fill=BS), position = "dodge") +
+  theme(axis.text.x = element_text(angle = 70, size = 7, vjust = 1, hjust = 1)) +
+  ylab("Proportion") +
+  xlab("Amazon Categories") +
+  labs(title="Proportion of Categories in NYT Bestselling Middle Grade \n vs All Middle Grade, 2015-2023") + 
+  scale_fill_discrete(name = "NYT Best Seller?", labels = c("No","Yes")) +
+  scale_x_discrete(labels = c("Action & Adventure", "Fantasy & Magic" ,"Friendship","Mystery, Detective, & Spy","Black & African American Story","Emotions & Feelings","Self-Esteem","Prejudice & Racism","Humorous Comics & Graphic Novels","Girls' & Women's Issues"))
+  
+ggsave("NYTvNotBar.png")
+
+```
+
+
