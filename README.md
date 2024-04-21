@@ -4,8 +4,7 @@ Cora McAnulty's Data Science Portfolio
 ## Projects
 
 ### Board Game Geek Predictive Modeling 
-#### September 2023 - December 2023
-#### Group Project
+#### Group Project // September 2023 - December 2023
 
 ##### Premise
 Board Game Geek (BGG) is an online forum where users can describe, discuss, and rate boardgames. Using a dataset of 20,000 Board Games (found on Kaggle), our group used ensemble learning methods to create a model to predict which types of games would recieve the highest ratings on BGG.
@@ -15,8 +14,7 @@ Exploratory data analysis and graphics in R Markdown, Gradient Boosting with XGB
 
 
 ### Mauna Loa Time Series Analysis
-#### March 2024
-#### Group Project
+#### Group Project // March 2024
 
 ##### Premise
 Dr. Keeling began tracking CO2 in our atmosphere from Mauna Loa Observatory in Hawaii in the 1950's. This makes Keeling's data the longest recorded direct CO2 measurements from our atmosphere. Our group used time series data analysis to predict the CO2 ppm measurement for the month of April 2024.
@@ -46,8 +44,7 @@ Web scraping with Python, data cleaning, exploratory data analysis, and graphics
 
 
 ### FAO Stat and NFA Enviromental Machine Learning Project
-#### Group Project
-#### Feburary 2024 - Ongoing
+#### Group Project // Feburary 2024 - Ongoing
 
 ##### Premise
 The Food and Agriculture Organization (FAO) provides free data on the worldwide changing temperatures. We wanted to use these temperatures and time sereis data analysis to create predictive models for future temperatures, while also creating subsets of countries to predict in based on Machine Learning classification methods built off of Global Footprint Netwarks' (NFA) measurements of countries BioMass and Carbon Footprints.   
