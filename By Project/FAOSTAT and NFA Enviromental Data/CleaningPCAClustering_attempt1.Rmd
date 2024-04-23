@@ -1,0 +1,135 @@
+---
+title: "Fing Around"
+output: html_document
+date: "2024-04-04"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(naniar)
+library(stats)
+```
+
+```{r import-data}
+tempdat = read_csv("/Users/coramcanulty/Desktop/ML group project data/Environment_Temperature_change_E_All_Data/Environment_Temperature_change_E_All_Data_NOFLAG.csv")
+carbondat = read_csv("/Users/coramcanulty/Desktop/ML group project data/NFA 2018 Edition.csv")
+
+## https://data.world/footprint/nfa-2018-edition/workspace/data-dictionary
+## http://www.footprintnetwork.org/resources/glossary/
+
+## EFConsPerCap --  Ecological Footprint of consumption, per capita (the area used to support a defined population’s consumption. The consumption Footprint (in gha) includes the area needed to produce the materials consumed and the area needed to absorb the carbon dioxide emissions)
+
+## EFConsTotGHA -- Ecological Footprint of consumption, total global hectares
+
+## EFProdPerCap -- Ecological Footprint of production, per capita (the sum of the Footprints for all of the resources harvested and all of the waste generated within the defined geographical region.)
+
+## EFProdTotGHA -- Ecological Footprint of production, total global hectares
+
+```
+
+```{r clean-and-combine-data}
+tempdat.long = tempdat %>% 
+  filter(Months == "Meteorological year", `Area Code` < 5000, Element == "Temperature change") %>%
+  gather(key = "Year", value = "TempChange",9:71)
+
+tempdat.long$Year = as.numeric(sub("Y", "", tempdat.long$Year))
+
+carbondat.prod = carbondat %>% 
+  filter(record == "EFProdPerCap") %>%
+  replace_with_na(replace = list(carbon = "NULL")) %>%
+  mutate(carbon = as.numeric(carbon))
+
+carbondat.cons = carbondat %>% 
+  filter(record == "EFConsPerCap") %>%
+  replace_with_na(replace = list(carbon = "NULL")) %>%
+  mutate(carbon = as.numeric(carbon))
+
+carbondat.cons.prods = carbondat %>% 
+  filter(record == "EFConsPerCap"| record == "EFProdPerCap") %>%
+  select(country, year, record, carbon, country_code) %>%
+  replace_with_na(replace = list(carbon = "NULL")) %>%
+  mutate(carbon = as.numeric(carbon)) %>%
+  spread(key = record, value = carbon)
+
+temp.carbonProd = full_join(tempdat.long, carbondat.prod, join_by("Area Code"=="country_code", "Year"=="year"))
+
+temp.carbonCons = full_join(tempdat.long, carbondat.cons, join_by("Area Code"=="country_code", "Year"=="year"))
+
+temp.carbonConsProd = full_join(tempdat.long, carbondat.cons.prods, join_by("Area Code"=="country_code", "Year"=="year"))
+
+###
+
+carbondat.cons.land = carbondat %>% 
+  filter(record == "EFConsPerCap") %>%
+  replace_with_na(replace = list(carbon = "NULL", crop_land = "NULL", grazing_land = "NULL", forest_land = "NULL", fishing_ground = "NULL", built_up_land = "NULL")) %>%
+  mutate(carbon = as.numeric(carbon), crop_land = as.numeric(crop_land), grazing_land = as.numeric(grazing_land), forest_land= as.numeric(forest_land), fishing_ground = as.numeric(fishing_ground), built_up_land = as.numeric(built_up_land))
+
+carbondat.prod.land = carbondat %>% 
+  filter(record == "EFProdPerCap") %>%
+  replace_with_na(replace = list(carbon = "NULL", crop_land = "NULL", grazing_land = "NULL", forest_land = "NULL", fishing_ground = "NULL", built_up_land = "NULL")) %>%
+  mutate(carbon = as.numeric(carbon), crop_land = as.numeric(crop_land), grazing_land = as.numeric(grazing_land), forest_land= as.numeric(forest_land), fishing_ground = as.numeric(fishing_ground), built_up_land = as.numeric(built_up_land))
+
+carbondat.cons.prods.land = full_join(carbondat.cons.land, carbondat.prod.land, join_by("country_code", "year")) %>%
+  select(-"record.y", -"record.x", -"country.y", -"QScore.x", -"QScore.y") %>%
+  na.omit(.)
+
+```
+
+```{r graphs_1}
+ggplot(temp.carbonProd, aes(x = TempChange, y = carbon)) +
+  geom_point(alpha = .2)
+
+ggplot(temp.carbonCons, aes(x = TempChange, y = carbon)) +
+  geom_point(alpha =.2)
+
+ggplot(temp.carbonConsProd, aes(x= EFConsPerCap, y = EFProdPerCap, color = TempChange)) +
+  geom_point(alpha = .8)
+
+ggplot(carbondat.cons.prods.land, aes(x= crop_land.x, y = built_up_land.x, color = forest_land.x)) +
+  geom_point(alpha = .8)
+```
+
+```{r pca}
+carbondat.forpca = carbondat.cons.prods.land %>%
+  select(-"country.x", -"year", -"country_code", -"total.x", -"total.y")
+
+pca = prcomp(carbondat.forpca,scale=T)$x[,1:2]
+
+plot(pca)
+
+?prcomp
+```
+
+```{r clustering}
+
+kmeans = kmeans(na.omit(carbondat.cons.prods.land[4:9]), center = 3 )
+clustersk3 = kmeans$cluster
+
+carbondat.cons.prods.land$clustersk3 = clustersk3
+
+ggplot(carbondat.cons.prods.land, aes(x=total.x, y=total.y, color = clustersk3))+
+  geom_point()
+
+ggplot(carbondat.cons.prods.land, aes(x=crop_land.y, y=built_up_land.y, color = clustersk3))+
+  geom_point()
+
+###
+ 
+pcaclust = cbind(pca, clustersk3)
+
+plot(pcaclust, main="PCA", col=clustersk3)
+
+###
+
+carbon.temp.cluster = full_join(tempdat.long, carbondat.cons.prods.land, join_by("Area Code"=="country_code", "Year"=="year")) %>%
+  na.omit(.)
+
+ggplot(carbon.temp.cluster, aes(x = carbon.y, y = TempChange, color = clustersk3)) +
+  geom_point()
+
+tempdat.long
+```

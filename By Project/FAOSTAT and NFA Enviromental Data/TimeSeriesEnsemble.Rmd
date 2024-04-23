@@ -1,0 +1,548 @@
+---
+title: "Time Series Ensembles"
+output: html_document
+date: "2024-04-23"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(itsmr)
+```
+
+```{r, warning=F}
+temp = read_csv("/Users/coramcanulty/Desktop/ML group project data/Environment_Temperature_change_E_All_Data/Environment_Temperature_change_E_All_Data_NOFLAG.csv")
+
+k2_1 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k2_1")[[2]]
+k2_2 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k2_2")[[2]]
+
+k3_1 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k3_1")[[2]]
+k3_2 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k3_2")[[2]]
+k3_3 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k3_3")[[2]]
+
+k5_1 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k5_1")[[2]]
+k5_2 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k5_2")[[2]]
+k5_3 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k5_3")[[2]]
+k5_4 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k5_4")[[2]]
+k5_5 = read_csv("/Users/coramcanulty/Desktop/ML group project data/k5_5")[[2]]
+
+
+```
+
+```{r}
+timeseries_rmse = function(pred, true){
+  
+  resid = (true-pred)^2
+  rmse = sqrt(sum(resid)/length(resid))
+  
+  return(rmse)
+}
+
+true_world = temp %>% 
+  filter(Area == "World", Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(.) %>%
+  .[59:63]
+```
+
+
+```{r k2}
+k2_1_avg = temp %>% 
+  .[( temp$`Area Code` %in% k2_1),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k2_2_avg= temp %>% 
+  .[( temp$`Area Code` %in% k2_2),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+train1 = k2_1_avg[1:58]
+
+fitk21 = c("trend", 2)
+model_k21 = arma(Resid(train1, fitk21), p = 2, q=2)
+gr21.m = trend(train1,2)
+elim_k21 = train1 - gr21.m
+plota(elim_k21, model_k21)
+#test(Resid(train1, fitk21, model_k21))
+
+fc1 = forecast(train1, fitk21, model_k21, h=5, opt=0)
+pred_k21 = fc1$pred
+
+
+train2 = k2_2_avg[1:58]
+
+fitk22 = c("trend", 2)
+model_k22 = arma(Resid(train2, fitk22), p = 2, q=2)
+gr22.m = trend(train2,2)
+elim_k22 = train2 - gr22.m
+plota(elim_k22, model_k22)
+#test(Resid(train2, fitk22, model_k22))
+
+fc2 = forecast(train2, fitk22, model_k22, h=5, opt=0)
+pred_k22 = fc2$pred
+
+#########
+
+pred_k2 = rbind(pred_k21, pred_k22) %>% colMeans(.)
+
+"Ensemble RMSE"
+timeseries_rmse(pred_k2, true_world)
+
+"Group 1 (big group) Pred RMSE"
+timeseries_rmse(pred_k21, true_world)
+
+"Group 2 (small group) Pred RMSE"
+timeseries_rmse(pred_k22, true_world)
+
+```
+
+
+
+
+
+```{r k3}
+k3_1_avg = temp %>% 
+  .[( temp$`Area Code` %in% k3_1),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k3_2_avg= temp %>% 
+  .[( temp$`Area Code` %in% k3_2),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k3_3_avg= temp %>% 
+  .[( temp$`Area Code` %in% k3_3),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+
+###############
+
+
+train31 = k3_1_avg[1:58]
+
+fitk31 = c("trend", 2)
+model_k31 = arma(Resid(train31, fitk31), p = 5, q=5)
+gr31.m = trend(train31,2)
+elim_k31 = train31 - gr31.m
+plota(elim_k31, model_k31)
+#test(Resid(train31, fitk31, model_k31))
+
+fc31 = forecast(train31, fitk31, model_k31, h=5, opt=0)
+pred_k31 = fc31$pred
+
+
+
+train32 = k3_2_avg[1:58]
+
+fitk32 = c("trend", 2)
+model_k32 = arma(Resid(train32, fitk32), p = 8, q=5)
+gr32.m = trend(train32,2)
+elim_k32 = train32 - gr32.m
+plota(elim_k32, model_k32)
+#test(Resid(train32, fitk32, model_k32))
+
+fc32 = forecast(train32, fitk32, model_k32, h=5, opt=0)
+pred_k32 = fc32$pred
+
+
+
+train33 = k3_3_avg[1:58]
+
+fitk33 = c("trend", 2)
+model_k33 = arma(Resid(train33, fitk33), p = 2, q=2)
+gr33.m = trend(train33,2)
+elim_k33 = train33 - gr33.m
+plota(elim_k33, model_k33)
+#test(Resid(train33, fitk33, model_k33))
+
+fc33 = forecast(train33, fitk33, model_k33, h=5, opt=0)
+pred_k33 = fc33$pred
+
+#########
+
+pred_k3 = rbind(pred_k31, pred_k32, pred_k33) %>% colMeans(.)
+
+"Ensemble RMSE"
+timeseries_rmse(pred_k3, true_world)
+
+"us,russia,india, brazil rmse"
+timeseries_rmse(pred_k31, true_world)
+"china rmse"
+timeseries_rmse(pred_k32, true_world)
+"else rmse"
+timeseries_rmse(pred_k33, true_world)
+
+```
+
+
+
+
+```{r k5}
+k5_1_avg = temp %>% 
+  .[( temp$`Area Code` %in% k5_1),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k5_2_avg= temp %>% 
+  .[( temp$`Area Code` %in% k5_2),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k5_3_avg= temp %>% 
+  .[( temp$`Area Code` %in% k5_3),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k5_4_avg= temp %>% 
+  .[( temp$`Area Code` %in% k5_4),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+k5_5_avg= temp %>% 
+  .[( temp$`Area Code` %in% k5_5),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+
+###############
+
+
+train51 = k5_1_avg[1:58]
+
+fitk51 = c("trend", 2)
+model_k51 = arma(Resid(train51, fitk51), p = 2, q=2)
+gr51.m = trend(train51,2)
+elim_k51 = train51 - gr51.m
+plota(elim_k51, model_k51)
+#test(Resid(train51, fitk51, model_k51))
+
+fc51 = forecast(train51, fitk51, model_k51, h=5, opt=0)
+pred_k51 = fc51$pred
+
+
+
+train52 = k5_2_avg[1:58]
+
+fitk52 = c("trend", 2)
+model_k52 = arma(Resid(train52, fitk52), p = 3, q=3)
+gr52.m = trend(train52,2)
+elim_k52 = train52 - gr52.m
+plota(elim_k52, model_k52)
+#test(Resid(train52, fitk52, model_k52))
+
+fc52 = forecast(train52, fitk52, model_k52, h=5, opt=0)
+pred_k52 = fc52$pred
+
+
+
+train53 = k5_3_avg[1:58]
+
+fitk53 = c("trend", 2)
+model_k53 = arma(Resid(train53, fitk53), p = 8, q=4)
+gr53.m = trend(train53,2)
+elim_k53 = train53 - gr53.m
+plota(elim_k53, model_k53)
+#test(Resid(train53, fitk53, model_k53))
+
+fc53 = forecast(train53, fitk53, model_k53, h=5, opt=0)
+pred_k53 = fc53$pred
+
+
+
+train54 = k5_4_avg[1:58]
+
+fitk54 = c("trend", 2)
+model_k54 = arma(Resid(train54, fitk54), p = 4, q=8)
+gr54.m = trend(train54,2)
+elim_k54 = train54 - gr54.m
+plota(elim_k54, model_k54)
+#test(Resid(train54, fitk54, model_k54))
+
+fc54 = forecast(train54, fitk54, model_k54, h=5, opt=2)
+pred_k54 = fc54$pred
+
+
+
+train55 = k5_5_avg[1:58]
+
+fitk55 = c("trend", 2)
+model_k55 = arma(Resid(train55, fitk55), p = 9, q=6)
+gr55.m = trend(train55,2)
+elim_k55 = train55 - gr55.m
+plota(elim_k55, model_k55)
+#test(Resid(train55, fitk55, model_k55))
+
+fc55 = forecast(train55, fitk55, model_k55, h=5, opt=0)
+pred_k55 = fc55$pred
+
+#########
+
+pred_k5 = rbind(pred_k51, pred_k52, pred_k53, pred_k54, pred_k55) %>% colMeans(.)
+
+"Ensemble RMSE"
+timeseries_rmse(pred_k5, true_world)
+
+"big group rmse"
+timeseries_rmse(pred_k51, true_world)
+"big group rmse"
+timeseries_rmse(pred_k52, true_world)
+"us rmse"
+timeseries_rmse(pred_k53, true_world)
+"brazil, india, russia, rmse"
+timeseries_rmse(pred_k54, true_world)
+"china rmse"
+timeseries_rmse(pred_k55, true_world)
+
+
+
+```
+
+
+```{r, warning=F}
+
+hi3_1 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi3_1")[[2]]
+hi3_2 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi3_2")[[2]]
+hi3_3 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi3_3")[[2]]
+
+hi5_1 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi5_1")[[2]]
+hi5_2 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi5_2")[[2]]
+hi5_3 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi5_3")[[2]]
+hi5_4 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi5_4")[[2]]
+hi5_5 = read_csv("/Users/coramcanulty/Desktop/ML group project data/hi5_5")[[2]]
+
+
+```
+
+```{r hi=3}
+
+hi3_1_avg = temp %>% 
+  .[( temp$`Area Code` %in% hi3_1),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+hi3_2_avg= temp %>% 
+  .[( temp$`Area Code` %in% hi3_2),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+hi3_3_avg= temp %>% 
+  .[( temp$`Area Code` %in% hi3_3),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+###############
+
+
+Htrain31 = hi3_1_avg[1:58]
+
+fitH31 = c("trend", 2)
+model_H31 = arma(Resid(Htrain31, fitH31), p = 6, q=8)
+Hgr31.m = trend(Htrain31,2)
+elim_H31 = Htrain31 - Hgr31.m
+plota(elim_H31, model_H31)
+#test(Resid(Htrain31, fitH31, model_H31))
+
+fcH31 = forecast(Htrain31, fitH31, model_H31, h=5, opt=0)
+pred_H31 = fcH31$pred
+
+
+
+Htrain32 = hi3_2_avg[1:58]
+
+fitH32 = c("trend", 2)
+model_H32 = arma(Resid(train32, fitH32), p = 5, q=5)
+Hgr32.m = trend(Htrain32,2)
+elim_H32 = Htrain32 - Hgr32.m
+plota(elim_H32, model_H32)
+#test(Resid(Htrain32, fitH32, model_H32))
+#autofit(Resid(Htrain32, fitH32), p =0:8, q=0:8)
+
+fcH32 = forecast(Htrain32, fitH32, model_H32, h=5, opt=0)
+pred_H32 = fcH32$pred
+
+
+
+Htrain33 = hi3_3_avg[1:58]
+
+fitH33 = c("trend", 2)
+model_H33 = arma(Resid(Htrain33, fitH33), p = 3, q=5)
+Hgr33.m = trend(Htrain33,2)
+Helim_k33 = Htrain33 - Hgr33.m
+plota(Helim_k33, model_H33)
+#test(Resid(Htrain33, fitH33, model_H33))
+#autofit(Resid(Htrain33, fitH33), p =1:5, q=1:5)
+
+fcH33 = forecast(Htrain33, fitH33, model_H33, h=5, opt=0)
+pred_H33 = fcH33$pred
+
+#########
+
+pred_H3 = rbind(pred_H31, pred_H32, pred_H33) %>% colMeans(.)
+
+"Ensemble RMSE"
+timeseries_rmse(pred_H3, true_world)
+
+"group1 rmse"
+timeseries_rmse(pred_H31, true_world)
+"group2 rmse"
+timeseries_rmse(pred_H32, true_world)
+"group3 rmse"
+timeseries_rmse(pred_H33, true_world)
+
+```
+
+
+
+```{r hi=3}
+
+hi5_1_avg = temp %>% 
+  .[( temp$`Area Code` %in% hi5_1),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+hi5_2_avg= temp %>% 
+  .[( temp$`Area Code` %in% hi5_2),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+hi5_3_avg= temp %>% 
+  .[( temp$`Area Code` %in% hi5_3),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+hi5_4_avg= temp %>% 
+  .[( temp$`Area Code` %in% hi5_4),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+hi5_5_avg= temp %>% 
+  .[( temp$`Area Code` %in% hi5_5),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(na.rm = T)
+
+###############
+
+
+Htrain51 = hi5_1_avg[1:58]
+
+fitH51 = c("trend", 2)
+model_H51 = arma(Resid(Htrain51, fitH51), p = 3, q=3)
+Hgr51.m = trend(Htrain51,2)
+elim_H51 = Htrain51 - Hgr51.m
+plota(elim_H51, model_H51)
+#test(Resid(Htrain51, fitH51, model_H51))
+#autofit(Resid(Htrain51, fitH51), p =0:8, q=0:8)
+
+fcH51 = forecast(Htrain51, fitH51, model_H51, h=5, opt=0)
+pred_H51 = fcH51$pred
+
+
+
+Htrain52 = hi5_2_avg[1:58]
+
+fitH52 = c("trend", 2)
+model_H52 = arma(Resid(train52, fitH52), p =1 , q=2)
+Hgr52.m = trend(Htrain52,2)
+elim_H52 = Htrain52 - Hgr52.m
+plota(elim_H52, model_H52)
+#test(Resid(Htrain52, fitH52, model_H52))
+#autofit(Resid(Htrain52, fitH52), p =0:8, q=0:8)
+
+fcH52 = forecast(Htrain52, fitH52, model_H52, h=5, opt=0)
+pred_H52 = fcH52$pred
+
+
+
+Htrain53 = hi5_3_avg[1:58]
+
+fitH53 = c("trend", 2)
+model_H53 = arma(Resid(Htrain53, fitH53), p = 8, q=7)
+Hgr53.m = trend(Htrain53,2)
+Helim_k53 = Htrain53 - Hgr53.m
+plota(Helim_k53, model_H53)
+#test(Resid(Htrain53, fitH53, model_H53))
+#autofit(Resid(Htrain53, fitH53), p =1:8, q=1:8)
+
+fcH53 = forecast(Htrain53, fitH53, model_H53, h=5, opt=0)
+pred_H53 = fcH53$pred
+
+
+
+
+Htrain54 = hi5_4_avg[1:58]
+
+fitH54 = c("trend", 2)
+model_H54 = arma(Resid(train54, fitH54), p =1 , q=1)
+Hgr54.m = trend(Htrain54,2)
+elim_H54 = Htrain54 - Hgr54.m
+plota(elim_H54, model_H54)
+#test(Resid(Htrain54, fitH54, model_H54))
+#autofit(Resid(Htrain54, fitH54), p =0:8, q=0:8)
+
+fcH54 = forecast(Htrain54, fitH54, model_H54, h=5, opt=0)
+pred_H54 = fcH54$pred
+
+
+
+Htrain55 = hi5_5_avg[1:58]
+
+fitH55 = c("trend", 2)
+model_H55 = arma(Resid(Htrain55, fitH55), p = 0, q=1)
+Hgr55.m = trend(Htrain55,2)
+Helim_k55 = Htrain55 - Hgr55.m
+plota(Helim_k55, model_H55)
+#test(Resid(Htrain55, fitH55, model_H55))
+#autofit(Resid(Htrain55, fitH55), p =0:8, q=0:8)
+
+fcH55 = forecast(Htrain55, fitH55, model_H55, h=5, opt=0)
+pred_H55 = fcH55$pred
+
+
+
+
+#########
+
+pred_H5 = rbind(pred_H51, pred_H52, pred_H53, pred_H54, pred_H55) %>% colMeans(.)
+
+"Ensemble RMSE"
+timeseries_rmse(pred_H5, true_world)
+
+"group1 rmse"
+timeseries_rmse(pred_H51, true_world)
+"group2 rmse"
+timeseries_rmse(pred_H52, true_world)
+"group3 rmse"
+timeseries_rmse(pred_H53, true_world)
+"group4 rmse"
+timeseries_rmse(pred_H54, true_world)
+"group5 rmse"
+timeseries_rmse(pred_H55, true_world)
+
+```
+
+
+
+
+

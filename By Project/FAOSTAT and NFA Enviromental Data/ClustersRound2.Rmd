@@ -1,0 +1,283 @@
+---
+title: "ClusteringAttempt1"
+output: html_document
+date: "2024-04-07"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(naniar)
+library(stats)
+library(itsmr)
+```
+
+
+```{r}
+carbondat1 = read_csv("/Users/coramcanulty/Desktop/ML group project data/NFA 2018 Edition.csv")
+
+carbondat1 %>% 
+  filter(record == "AreaPerCap", carbon !=0 , carbon != "NULL")
+carbondat1 %>% 
+  filter(record == "AreaTotHA", carbon !=0 , carbon != "NULL")
+carbondat1 %>% 
+  filter(record == "BiocapPerCap", carbon !=0 , carbon != "NULL")
+carbondat1 %>% 
+  filter(record == "BiocapTotGHA", carbon !=0 , carbon != "NULL")
+
+carbondat = carbondat1 %>%
+  filter(country != "World")
+
+```
+
+```{r looking-at-gha}
+carbondat.2 = carbondat %>% replace_with_na(replace = list(carbon = "NULL", crop_land = "NULL", grazing_land = "NULL", forest_land = "NULL", fishing_ground = "NULL", built_up_land = "NULL"))
+
+```
+
+
+```{r}
+
+carbondat.wide = carbondat.2 %>%
+  gather(variable, value, 5:12) %>%
+  unite(temp, record, variable) %>%
+  spread(temp, value) %>%
+  select(-"AreaPerCap_carbon", -"AreaTotHA_carbon", "BiocapPerCap_carbon", -"BiocapTotGHA_carbon")
+
+carbondat.wide.QA = carbondat.wide %>%
+  select("country", "year", "country_code", "AreaPerCap_QScore", "AreaTotHA_QScore", "BiocapPerCap_QScore", "BiocapTotGHA_QScore", "EFConsPerCap_QScore", "EFConsTotGHA_QScore", "EFProdTotGHA_QScore", "EFProdPerCap_QScore")
+
+carbondat.wide.noQA = carbondat.wide %>%
+  select(-"AreaPerCap_QScore", -"AreaTotHA_QScore", -"BiocapPerCap_QScore", -"BiocapTotGHA_QScore", -"EFConsPerCap_QScore", -"EFConsTotGHA_QScore", -"EFProdTotGHA_QScore", -"EFProdPerCap_QScore")
+```
+
+```{r}
+carbondat.wide.noQA.PerCap = carbondat.wide.noQA %>% 
+  select(1:3,contains("PerCap"))
+carbondat.wide.noQA.GHA = carbondat.wide.noQA %>% 
+  select(-contains("PerCap"))
+```
+
+```{r}
+set.seed(336)
+
+kmeans_k2 = kmeans(na.omit(carbondat.wide.noQA[4:56]), center = 2 )
+clusters_k2 = kmeans_k2$cluster
+clustcountry = na.omit(carbondat.wide.noQA) %>% .[1:4]
+clustcountry$clusters = clusters_k2
+
+
+kmeans_k4 = kmeans(na.omit(carbondat.wide.noQA[4:56]), center = 4 )
+clusters_k4 = kmeans_k4$cluster
+
+kmeans_k5 = kmeans(na.omit(carbondat.wide.noQA[4:56]), center = 5 )
+clusters_k5 = kmeans_k5$cluster
+
+use = as.data.frame(lapply(na.omit(carbondat.wide.noQA[4:56]), as.numeric))
+pca = prcomp(use,scale=F)$x[,1:2]
+
+### got an error in scaling data
+
+pcaclust = cbind(pca, clusters_k2)
+plot(pcaclust, main="PCA", col=clusters_k2)
+
+pcaclust = cbind(pca, clusters_k4)
+plot(pcaclust, main="PCA", col=clusters_k4)
+
+###
+
+use2 = as.data.frame(lapply(na.omit(carbondat.wide.noQA.PerCap[4:30]), as.numeric))
+pca2 = prcomp(use2,scale=F)$x[,1:2]
+pcaclust2 = cbind(pca2, clusters_k2)
+
+plot(pcaclust2, main="PCA", col=clusters_k2)
+
+use3 = as.data.frame(lapply(na.omit(carbondat.wide.noQA.GHA[4:29]), as.numeric))
+pca3 = prcomp(use3,scale=T)$x[,1:2]
+pcaclust3 = cbind(pca3, clusters_k4)
+
+plot(pcaclust3, main="PCA", col=clusters_k4)
+
+## try hierarchical clustering
+### time series with cluster
+
+```
+
+```{r}
+clustcountry %>%
+  filter(clusters == 2) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry %>%
+  filter(clusters == 1) %>%
+  .$country %>%
+  unique(.)
+```
+
+```{r only-2014-3-clusters}
+
+carbondat.wide.noQA.2014 = carbondat.wide.noQA %>% filter(year==2014)
+
+
+kmeans_k3 = kmeans(na.omit(carbondat.wide.noQA.2014[4:56]), center = 3 )
+clusters_k3 = kmeans_k3$cluster
+clustcountry.3 = na.omit(carbondat.wide.noQA.2014) %>% .[1:4]
+clustcountry.3$clusters = clusters_k3
+
+use2 = as.data.frame(lapply(na.omit(carbondat.wide.noQA.2014[4:56]), as.numeric))
+pca2 = prcomp(use,scale=F)$x[,1:2]
+
+pcaclust.3 = cbind(pca2, clusters_k3)
+plot(pcaclust.3, main="PCA", col=clusters_k3)
+
+clustcountry.3 %>%
+  filter(clusters == 3) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry.3 %>%
+  filter(clusters == 2) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry.3 %>%
+  filter(clusters == 1) %>%
+  .$country %>%
+  unique(.)
+
+```
+
+```{r only-2014-5-clusters}
+
+carbondat.wide.noQA.2014 = carbondat.wide.noQA %>% filter(year==2014)
+
+
+kmeans_k5.2 = kmeans(na.omit(carbondat.wide.noQA.2014[4:56]), center = 5 )
+clusters_k5.2 = kmeans_k5.2$cluster
+clustcountry.5 = na.omit(carbondat.wide.noQA.2014) %>% .[1:4]
+clustcountry.5$clusters = clusters_k5.2
+
+pcaclust.5 = cbind(pca2, clusters_k5.2)
+plot(pcaclust.5, main="PCA", col=clusters_k5.2)
+
+
+clustcountry.5 %>%
+  filter(clusters == 5) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry.5 %>%
+  filter(clusters == 4) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry.5 %>%
+  filter(clusters == 3) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry.5 %>%
+  filter(clusters == 2) %>%
+  .$country %>%
+  unique(.)
+
+clustcountry.5 %>%
+  filter(clusters == 1) %>%
+  .$country %>%
+  unique(.)
+
+```
+
+```{r ALL GROUPS }
+
+k_means_allyears_k2.group1 = clustcountry %>%
+  filter(clusters == 1) %>%
+  .$country_code %>%
+  unique(.)
+
+k_means_allyears_k2.group2 = clustcountry %>%
+  filter(clusters == 2) %>%
+  .$country_code %>%
+  unique(.)
+
+k_means_2014_k3.group1 =clustcountry.3 %>%
+  filter(clusters == 1) %>%
+  .$country_code %>%
+  unique(.)
+k_means_2014_k3.group2 =clustcountry.3 %>%
+  filter(clusters == 2) %>%
+  .$country_code %>%
+  unique(.)
+k_means_2014_k3.group3 =clustcountry.3 %>%
+  filter(clusters == 3) %>%
+  .$country_code %>%
+  unique(.)
+
+k_means_2014_k5.group1 = clustcountry.5 %>%
+  filter(clusters == 1) %>%
+  .$country_code %>%
+  unique(.)
+k_means_2014_k5.group2 =clustcountry.5 %>%
+  filter(clusters == 2) %>%
+  .$country_code %>%
+  unique(.)
+k_means_2014_k5.group3 = clustcountry.5 %>%
+  filter(clusters == 3) %>%
+  .$country_code %>%
+  unique(.)
+k_means_2014_k5.group4 = clustcountry.5 %>%
+  filter(clusters == 4) %>%
+  .$country_code %>%
+  unique(.)
+k_means_2014_k5.group5 = clustcountry.5 %>%
+  filter(clusters == 5) %>%
+  .$country_code %>%
+  unique(.)
+
+```
+
+```{r}
+temp = read_csv("/Users/coramcanulty/Desktop/ML group project data/Environment_Temperature_change_E_All_Data/Environment_Temperature_change_E_All_Data_NOFLAG.csv")
+```
+
+```{r k means all years k=2}
+k2_group1 = temp %>% 
+  .[( temp$`Area Code` %in% k_means_allyears_k2.group1),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change")
+
+k2_group2 = temp %>% 
+  .[( temp$`Area Code` %in% k_means_allyears_k2.group2),] %>% 
+  filter(Months == "Meteorological year", Element == "Temperature change")
+
+group1_avg = colMeans(k2_group1[9:71],na.rm = T)
+group2_avg = colMeans(k2_group2[9:71],na.rm = T)
+plotc(group1_avg)
+plotc(group2_avg)
+
+gr1.s = season(group1_avg, 5)
+gr1.elim.s = group1_avg - gr1.s
+plotc(gr1.elim.s)
+gr1.m = trend(gr1.elim.s,2)
+gr1.elim.s.m = group1_avg - gr1.s - gr1.m
+plotc(gr1.elim.s.m)
+plota(gr1.elim.s.m)
+
+fit= c("season", 5, "trend", 2)
+model = arma(Resid(group1_avg, fit), p = 2, q=2)
+plota(gr1.elim.s.m, model)
+
+model2 = arma(Resid(group2_avg, fit), p = 2, q=2)
+```
+
+```{r k means all years k=2}
+
+
+
+```
+
+
+
