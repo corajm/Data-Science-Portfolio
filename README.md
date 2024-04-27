@@ -1,6 +1,3 @@
-# Data Science Portfolio
-Cora McAnulty's Data Science Portfolio
-
 ## Projects
 
 ### Board Game Geek Predictive Modeling 
