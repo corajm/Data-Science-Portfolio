@@ -39,11 +39,19 @@ timeseries_rmse = function(pred, true){
   return(rmse)
 }
 
+world = temp %>% 
+  filter(Area == "World", Months == "Meteorological year", Element == "Temperature change") %>%
+  .[,9:71] %>%
+  colMeans(.)
+
 true_world = temp %>% 
   filter(Area == "World", Months == "Meteorological year", Element == "Temperature change") %>%
   .[,9:71] %>%
   colMeans(.) %>%
   .[59:63]
+
+
+?tseries::adf.test
 ```
 
 
@@ -233,6 +241,8 @@ plota(elim_k51, model_k51)
 fc51 = forecast(train51, fitk51, model_k51, h=5, opt=0)
 pred_k51 = fc51$pred
 
+pred_k51_long = forecast(k5_1_avg, fitk51, model_k51, h=20, opt=0) %>% .$pred
+
 
 
 train52 = k5_2_avg[1:58]
@@ -246,6 +256,8 @@ plota(elim_k52, model_k52)
 
 fc52 = forecast(train52, fitk52, model_k52, h=5, opt=0)
 pred_k52 = fc52$pred
+
+pred_k52_long = forecast(k5_2_avg, fitk52, model_k52, h=20, opt=0) %>% .$pred
 
 
 
@@ -261,6 +273,8 @@ plota(elim_k53, model_k53)
 fc53 = forecast(train53, fitk53, model_k53, h=5, opt=0)
 pred_k53 = fc53$pred
 
+pred_k53_long = forecast(k5_3_avg, fitk53, model_k53, h=20, opt=0) %>% .$pred
+
 
 
 train54 = k5_4_avg[1:58]
@@ -275,38 +289,76 @@ plota(elim_k54, model_k54)
 fc54 = forecast(train54, fitk54, model_k54, h=5, opt=2)
 pred_k54 = fc54$pred
 
+pred_k54_long = forecast(k5_4_avg, fitk54, model_k54, h=20, opt=0) %>% .$pred
+
 
 
 train55 = k5_5_avg[1:58]
 
 fitk55 = c("trend", 2)
-model_k55 = arma(Resid(train55, fitk55), p = 9, q=6)
+model_k55 = arma(Resid(train55, fitk55), p = 5, q=4)
 gr55.m = trend(train55,2)
 elim_k55 = train55 - gr55.m
 plota(elim_k55, model_k55)
+#autofit(Resid(train55, fitk55), p =5:9, q=4:6)
 #test(Resid(train55, fitk55, model_k55))
 
-fc55 = forecast(train55, fitk55, model_k55, h=5, opt=0)
+fc55 = forecast(train55, fitk55, model_k55, h=5, opt=2)
 pred_k55 = fc55$pred
+
+pred_k55_long = forecast(k5_5_avg, fitk55, model_k55, h=20, opt=0) %>% .$pred
 
 #########
 
 pred_k5 = rbind(pred_k51, pred_k52, pred_k53, pred_k54, pred_k55) %>% colMeans(.)
 
+pred_k5_long = rbind(pred_k51_long, pred_k52_long, pred_k53_long, pred_k54_long, pred_k55_long) %>% colMeans(.)
+
 "Ensemble RMSE"
 timeseries_rmse(pred_k5, true_world)
 
-"big group rmse"
-timeseries_rmse(pred_k51, true_world)
-"big group rmse"
-timeseries_rmse(pred_k52, true_world)
-"us rmse"
-timeseries_rmse(pred_k53, true_world)
-"brazil, india, russia, rmse"
-timeseries_rmse(pred_k54, true_world)
-"china rmse"
-timeseries_rmse(pred_k55, true_world)
 
+"Group 1 - Brazil, India, Russia rmse"
+timeseries_rmse(pred_k54, true_world)
+"Group 2 - China rmse"
+timeseries_rmse(pred_k55, true_world)
+"Group 3 rmse"
+timeseries_rmse(pred_k51, true_world)
+"Group 4"
+timeseries_rmse(pred_k52, true_world)
+"Group 5 - USA rmse"
+timeseries_rmse(pred_k53, true_world)
+
+
+#############################
+
+cbind(`Group 1 - Brazil, India, Russia` = k5_4_avg, `Group 2 - China` = k5_5_avg, `Group 3` = k5_1_avg,`Group 4` = k5_2_avg,  `Group 5 - USA` = k5_3_avg, Year = 1961:2023) %>%
+  as.data.frame() %>%
+  gather(key = "Cluster", value = "Temperature", -Year) %>%
+  ggplot(.) +
+  geom_line(aes(x=Year, y=Temperature, color = Cluster), alpha = .8) +
+  scale_color_brewer(palette="Spectral") +
+  ggtitle("Temperature Change Graph By Cluster")
+
+
+
+cbind(`Group 1 - Brazil, India, Russia` = pred_k54_long, `Group 2 - China` = pred_k55_long, `Group 3` = pred_k51_long, `Group 4` = pred_k52_long, `Group 5 - USA` = pred_k53_long, Year = 2024:2043, total = pred_k5_long) %>%
+  as.data.frame() %>%
+  gather(key = "Clusters", value = "Temperature", 1:5) %>%
+  ggplot(.) +
+  geom_line(aes(x=Year, y=Temperature, color = Clusters), alpha = .7) +
+  geom_line(aes(x=Year, y=total), color = "black") +
+  ggtitle("20 Year Future Predictions")+
+  scale_color_brewer(palette="Spectral")
+
+cbind(`Group 1 - Brazil, India, Russia` = pred_k54, `Group 2 - China` = pred_k55, `Group 3` = pred_k51, `Group 4` = pred_k52, `Group 5 - USA` = pred_k53, Actual = true_world, Ensemble = pred_k5, Year = 2019:2023) %>%
+  as.data.frame() %>%
+  gather(key = "Clusters", value = "Temperature", 1:7) %>%
+  ggplot(.) +
+  geom_line(aes(x=Year, y=Temperature, color = Clusters)) + 
+  scale_color_brewer(palette="Spectral") +
+  ggtitle("Past 5 Years, Cluster's Forecast vs Actual") +
+  scale_color_manual(values=c("darkgray", "black", "#e5a3ad","#f7af71","#ffffb2","#afdaa8","#94bad9"))
 
 
 ```
@@ -362,6 +414,8 @@ plota(elim_H31, model_H31)
 fcH31 = forecast(Htrain31, fitH31, model_H31, h=5, opt=0)
 pred_H31 = fcH31$pred
 
+pred_H31_long = forecast(hi3_1_avg, fitH31, model_H31, h=20, opt=0) %>% .$pred
+
 
 
 Htrain32 = hi3_2_avg[1:58]
@@ -376,6 +430,9 @@ plota(elim_H32, model_H32)
 
 fcH32 = forecast(Htrain32, fitH32, model_H32, h=5, opt=0)
 pred_H32 = fcH32$pred
+
+pred_H32_long = forecast(hi3_2_avg, fitH32, model_H32, h=20, opt=0) %>% .$pred
+
 
 
 
@@ -392,9 +449,16 @@ plota(Helim_k33, model_H33)
 fcH33 = forecast(Htrain33, fitH33, model_H33, h=5, opt=0)
 pred_H33 = fcH33$pred
 
+pred_H33_long = forecast(hi3_3_avg, fitH33, model_H33, h=20, opt=0) %>% .$pred
+
+
 #########
 
 pred_H3 = rbind(pred_H31, pred_H32, pred_H33) %>% colMeans(.)
+
+pred_H3_long = rbind(pred_H31_long, pred_H32_long, pred_H33_long) %>% colMeans(.)
+
+
 
 "Ensemble RMSE"
 timeseries_rmse(pred_H3, true_world)
@@ -405,6 +469,34 @@ timeseries_rmse(pred_H31, true_world)
 timeseries_rmse(pred_H32, true_world)
 "group3 rmse"
 timeseries_rmse(pred_H33, true_world)
+
+################
+
+cbind(`Group 1` = hi3_1_avg, `Group 2` = hi3_2_avg, `Group 3` = hi3_3_avg, Year = 1961:2023, world) %>%
+  as.data.frame() %>%
+  gather(key = "Clusters", value = "Temperature", 1:3) %>%
+  ggplot(.) +
+  geom_line(aes(x=Year, y=Temperature, color = Clusters)) +
+  scale_color_brewer(palette="Spectral") +
+  ggtitle("Temperature Change Graph By Cluster")
+
+cbind(`Group 1` = pred_H31_long, `Group 2` = pred_H32_long, `Group 3` = pred_H33_long, Year = 2024:2043, total = pred_H3_long) %>%
+  as.data.frame() %>%
+  gather(key = "Clusters", value = "Temperature", 1:3) %>%
+  ggplot(.) +
+  geom_line(aes(x=Year, y=Temperature, color = Clusters)) +
+  geom_line(aes(x=Year, y=total), color = "black") + 
+  scale_color_brewer(palette="Spectral") +
+  ggtitle("20 Year Future Predictions")
+
+cbind(`Group 1` = pred_H31, `Group 2` = pred_H32, `Group 3` = pred_H33, Actual = true_world, Ensemble = pred_H3, Year = 2019:2023) %>%
+  as.data.frame() %>%
+  gather(key = "Clusters", value = "Temperature", 1:5) %>%
+  ggplot(.) +
+  geom_line(aes(x=Year, y=Temperature, color = Clusters)) + 
+  scale_color_brewer(palette="Spectral") +
+  ggtitle("Past 5 Years, Cluster's Forecast vs Actual") +
+  scale_color_manual(values=c("darkgray", "black", "#fb9e4f","#ffffb2","#9dd893"))
 
 ```
 
