@@ -1,3 +1,5 @@
+View all projects and study guides on my github
+
 # Data Portfolio
 
 ## Projects
@@ -50,3 +52,12 @@ The Food and Agriculture Organization (FAO) provides free data on the worldwide 
 
 ##### Methods
 data cleaning, time series analysis, and classification in R Markdown, Recurent Neural Networks in Python
+
+
+---
+***
+---
+
+## Study Guides
+
+For every math and statistics class in my college career I created a study guide. These study guides are highly decorative and combine my love for math and art. This started as a way for me to review the material and practice explaining the ideas in my own words. But my classmates found these study guides uniquely useful as well. Turning the content into an aesthetically pleasing design allowed me to make high level math and statistics feel more accessible. It also allowed me to split the content into easily digestible chunks that help the reader to understand and remember the concepts.
