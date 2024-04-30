@@ -1,6 +1,6 @@
-View all projects and study guides on my github
-
 # Data Portfolio
+
+View all projects and study guides on my github
 
 ## Projects
 
